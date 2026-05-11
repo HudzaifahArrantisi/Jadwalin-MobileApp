@@ -1,50 +1,31 @@
-# Welcome to your Expo app 👋
+# 📅 Jadwalin App — Beige Edition
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Jadwalin** adalah aplikasi manajemen waktu, produktivitas, dan pengingat jadwal dengan pendekatan desain antarmuka (UI/UX) yang estetik, hangat, dan minimalis (*Beige Edition*). Aplikasi ini didesain khusus agar terasa premium namun tidak kaku, membawa nuansa buku catatan klasik (*planner*) yang modern langsung ke genggaman tangan Anda.
 
-## Get started
+---
 
-1. Install dependencies
+## 🌟 Fitur Utama (Highlights)
 
-   ```bash
-   npm install
-   ```
+- **Kalender Interaktif & Multi-Indikator**: Tampilan kalender horizontal bergulir di Beranda (*Home*) dan tampilan bulan-penuh (*Full-month*) dengan indikator titik bergradasi warna atau ikon untuk tiap jadwal yang masuk.
+- **Manajemen Jadwal Harian & Mingguan**: Pemisahan visual yang jelas antara jadwal spesifik (*timeline* jam) dan *To-Do List* mingguan yang menampilkan efek *strikethrough* otomatis jika tugas terselesaikan.
+- **Daftar Saya (Notes)**: Sistem pencatatan multi-level bergaya binder. Buat berbagai kelompok catatan dengan kustomisasi Emoji dan warna khusus layaknya menempelkan *sticky notes*.
+- **Sinkronisasi Cloud Terintegrasi**: Ditenagai oleh ekosistem **Firebase** (*Auth* & *Firestore*) untuk memastikan daftar tugas, personalisasi nama/pekerjaan/alamat, serta foto profil Anda tersimpan aman dan selalu tersinkronisasi di berbagai sesi.
+- **Fluid UI & Glassmorphism**: Memanfaatkan kartu mengambang (*floating cards*), bayangan lembut (*soft shadows*), dan animasi halus perpindahan tab menggunakan Reanimated.
 
-2. Start the app
+## 🎨 Konsep Desain (Beige Palette)
 
-   ```bash
-   npx expo start
-   ```
+Aplikasi ini mendobrak gaya *template* aplikasi produktivitas yang umumnya kaku. Kami menggunakan palet warna *Earthy/Warm Tones*:
+*   **Krem & Beige (`#FFF5E6`)**: Latar kanvas utama yang tidak menyilaukan mata dan menenangkan.
+*   **Coklat Pekat (`#5C4033`)**: Memberikan kontras tegas untuk hierarki teks utama, ikonografi, dan tombol navigasi.
+*   **Hijau Pastel (`#E6F0E6`) & Merah Pastel**: Aksen tambahan pada komponen penyelesaian tugas (*Checklist/Checkbox*) atau notifikasi/keluar (*Logout*).
 
-In the output, you'll find options to open the app in a
+## 🛠 Struktur Teknologi
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Dibangun untuk berjalan mulus secara *cross-platform* (Android & iOS):
+- **Kerangka Utama**: React Native & Expo (TypeScript)
+- **State Management**: Zustand
+- **Backend/Database**: Firebase Authentication & Cloud Firestore
+- **Animasi & Grafis**: React Native Reanimated & Expo Vector Icons
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+*Dibuat untuk memaksimalkan produktivitas dan kedisiplinan jadwal Anda, tanpa harus mengorbankan estetika antarmuka.*
