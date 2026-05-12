@@ -6,7 +6,7 @@
 // Bug 7: Weekly list shows tasks within current week only
 // ============================================
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, RefreshControl, FlatList, Modal,
@@ -14,12 +14,19 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { 
+  FadeInDown, FadeIn, FadeInRight, 
+  Layout, useSharedValue, useAnimatedStyle, 
+  withSpring, withTiming, runOnJS 
+} from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
 import { Task } from '@/types/task.types';
 import { parseTaskDate } from '@/utils/date';
 import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH } from '@/constants/theme';
+import InteractivePressable from '@/components/InteractivePressable';
 
 const formatLocalDate = (d: Date) => {
   const y = d.getFullYear();
@@ -102,13 +109,13 @@ function CalendarDayItem({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity
+    <InteractivePressable
       style={[
         styles.dayItem,
         isSelected && styles.dayItemSelected,
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      hapticType={Haptics.ImpactFeedbackStyle.Light}
     >
       <Text style={[
         styles.dayName,
@@ -141,12 +148,12 @@ function CalendarDayItem({
           <View style={{ height: sw(12) }} />
         )}
       </View>
-    </TouchableOpacity>
+    </InteractivePressable>
   );
 }
 
 // ─── Daily Task Card (Brown section) ───
-function DailyTaskItem({ task }: { task: Task }) {
+function DailyTaskItem({ task, index }: { task: Task, index: number }) {
   const timeStr = task.scheduledStart && task.scheduledEnd
     ? `(${task.scheduledStart} - ${task.scheduledEnd})`
     : task.deadlineTime
@@ -154,7 +161,11 @@ function DailyTaskItem({ task }: { task: Task }) {
     : '';
 
   return (
-    <View style={styles.dailyItem}>
+    <Animated.View 
+      entering={FadeInRight.delay(index * 100).duration(400).springify()}
+      layout={Layout.springify()}
+      style={styles.dailyItem}
+    >
       <View style={styles.dailyDot} />
       <View style={styles.dailyContent}>
         <Text style={styles.dailyTitle} numberOfLines={1}>
@@ -167,15 +178,16 @@ function DailyTaskItem({ task }: { task: Task }) {
       {task.icon ? (
         <Ionicons name={task.icon as any} size={sw(18)} color={Colors.brownDark} />
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
 // ─── Weekly Task Row (White with border, green when completed) ───
 function WeeklyTaskItem({
-  task, onCheck,
+  task, index, onCheck,
 }: {
   task: Task;
+  index: number;
   onCheck: () => void;
 }) {
   const taskDate = parseTaskDate(task.date);
@@ -186,30 +198,37 @@ function WeeklyTaskItem({
   const isCompleted = task.status === 'completed';
 
   return (
-    <View style={[
-      styles.weeklyItem, 
-      isCompleted ? styles.weeklyItemCompleted : styles.weeklyItemActive
-    ]}>
-      <Text style={[
-        styles.weeklyDate, 
-        isCompleted && { textDecorationLine: 'line-through', color: Colors.white }
-      ]}>
-        {dateLabel}
-      </Text>
-      <Text style={[
-        styles.weeklyTitle, 
-        isCompleted && { textDecorationLine: 'line-through', color: 'rgba(255,255,255,0.8)' }
-      ]} numberOfLines={1}>
-        {task.title}
-      </Text>
-      <TouchableOpacity onPress={onCheck} activeOpacity={0.7}>
+    <Animated.View 
+      entering={FadeInDown.delay(index * 50).duration(400).springify()}
+      layout={Layout.springify()}
+    >
+      <InteractivePressable 
+        onPress={onCheck}
+        hapticType={Haptics.ImpactFeedbackStyle.Medium}
+        style={[
+          styles.weeklyItem, 
+          isCompleted ? styles.weeklyItemCompleted : styles.weeklyItemActive
+        ]}
+      >
+        <Text style={[
+          styles.weeklyDate, 
+          isCompleted && { textDecorationLine: 'line-through', color: Colors.white }
+        ]}>
+          {dateLabel}
+        </Text>
+        <Text style={[
+          styles.weeklyTitle, 
+          isCompleted && { textDecorationLine: 'line-through', color: 'rgba(255,255,255,0.8)' }
+        ]} numberOfLines={1}>
+          {task.title}
+        </Text>
         <Ionicons 
           name={isCompleted ? "checkmark-circle" : "ellipse-outline"} 
           size={sw(28)} 
           color={isCompleted ? Colors.white : Colors.textMuted} 
         />
-      </TouchableOpacity>
-    </View>
+      </InteractivePressable>
+    </Animated.View>
   );
 }
 
@@ -267,20 +286,20 @@ function MiniCalendarDropdown({
   return (
     <Modal visible={visible} transparent animationType="fade">
       <TouchableOpacity style={miniStyles.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={miniStyles.container}>
+        <Animated.View entering={FadeInDown.duration(300).springify()} style={miniStyles.container}>
           {/* Month nav */}
           <View style={miniStyles.monthRow}>
-            <TouchableOpacity onPress={() => {
+            <InteractivePressable onPress={() => {
               if (month === 0) { setMonth(11); setYear(year - 1); } else setMonth(month - 1);
             }}>
               <Ionicons name="chevron-back" size={sw(18)} color={Colors.brownDark} />
-            </TouchableOpacity>
+            </InteractivePressable>
             <Text style={miniStyles.monthText}>{MONTHS_ID[month]} {year}</Text>
-            <TouchableOpacity onPress={() => {
+            <InteractivePressable onPress={() => {
               if (month === 11) { setMonth(0); setYear(year + 1); } else setMonth(month + 1);
             }}>
               <Ionicons name="chevron-forward" size={sw(18)} color={Colors.brownDark} />
-            </TouchableOpacity>
+            </InteractivePressable>
           </View>
 
           {/* Day headers */}
@@ -298,14 +317,13 @@ function MiniCalendarDropdown({
               const hasTask = taskMap[day.dateStr];
 
               return (
-                <TouchableOpacity
+                <InteractivePressable
                   key={idx}
                   style={[miniStyles.cell, { width: cellW }, isSelected && miniStyles.cellSelected]}
                   onPress={() => {
                     onSelectDate(day.dateStr);
                     onClose();
                   }}
-                  activeOpacity={0.7}
                 >
                   <Text style={[
                     miniStyles.cellText,
@@ -316,11 +334,11 @@ function MiniCalendarDropdown({
                   {hasTask && (
                     <View style={[miniStyles.dot, isSelected && { backgroundColor: Colors.white }]} />
                   )}
-                </TouchableOpacity>
+                </InteractivePressable>
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
@@ -368,10 +386,10 @@ const miniStyles = StyleSheet.create({
   cell: {
     alignItems: 'center',
     paddingVertical: sw(5),
+    borderRadius: Radius.sm,
   },
   cellSelected: {
     backgroundColor: Colors.brownDark,
-    borderRadius: Radius.sm,
   },
   cellText: {
     fontSize: FontSize.sm,
@@ -489,9 +507,31 @@ export default function HomeScreen() {
   }, [selectedDate, todayStr, getTaskIndicatorsForDate]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container]}>
+      {/* ── Floating Header with Blur ── */}
+      <BlurView intensity={80} tint="light" style={[styles.blurHeader, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Animated.Text entering={FadeInRight.duration(400)} style={styles.dateTitle}>{displayedDate}</Animated.Text>
+          </View>
+          <InteractivePressable
+            onPress={() => router.push('/(tabs)/settings')}
+            hapticType={Haptics.ImpactFeedbackStyle.Light}
+          >
+            {user?.photoURL ? (
+              <Image source={{ uri: user.photoURL }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={sw(20)} color={Colors.cream} />
+              </View>
+            )}
+          </InteractivePressable>
+        </View>
+      </BlurView>
+
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={{ paddingTop: insets.top + sw(60) }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -501,27 +541,8 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* ── Header: Date + Avatar ── */}
-        <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.dateTitle}>{displayedDate}</Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)/settings')}
-            activeOpacity={0.7}
-          >
-            {user?.photoURL ? (
-              <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={sw(20)} color={Colors.cream} />
-              </View>
-            )}
-          </TouchableOpacity>
-        </Animated.View>
-
         {/* ── Horizontal Week Calendar (Bug 5: Scrollable) ── */}
-        <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <FlatList
             ref={flatListRef}
             data={weeks}
@@ -541,46 +562,51 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* ── Daily Activities Section (Brown Card) ── */}
-        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.dailySection}>
-          <TouchableOpacity
+        <Animated.View entering={FadeInDown.delay(200).duration(600).springify()} style={styles.dailySection}>
+          <InteractivePressable
             style={styles.dailyHeader}
             onPress={() => setShowMiniCalendar(true)}
-            activeOpacity={0.7}
+            hapticType={Haptics.ImpactFeedbackStyle.Medium}
           >
             <Text style={styles.dailyHeaderText}>{selectedDayLabel}</Text>
             <Ionicons name="chevron-down" size={sw(14)} color={Colors.white} />
-          </TouchableOpacity>
+          </InteractivePressable>
 
           {selectedDayTasks.length > 0 ? (
-            selectedDayTasks.map((task) => (
-              <DailyTaskItem key={task.id} task={task} />
-            ))
-          ) : (
-            <View style={styles.emptyDaily}>
-              <Text style={styles.emptyDailyText}>Tidak ada kegiatan</Text>
+            <View>
+              {selectedDayTasks.map((task, index) => (
+                <DailyTaskItem key={task.id} task={task} index={index} />
+              ))}
             </View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(400)} style={styles.emptyDaily}>
+              <Text style={styles.emptyDailyText}>Tidak ada kegiatan</Text>
+            </Animated.View>
           )}
         </Animated.View>
 
         {/* ── Weekly Activities List*/}
-        <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.weeklySection}>
+        <Animated.View entering={FadeInDown.delay(300).duration(600).springify()} style={styles.weeklySection}>
           <View style={styles.weeklyHeader}>
             <Text style={styles.weeklyHeaderText}>List kegiatan dalam 1 Minggu</Text>
             <Ionicons name="menu" size={sw(18)} color={Colors.textPrimary} />
           </View>
 
           {weekTasks.length > 0 ? (
-            weekTasks.map((task) => (
-              <WeeklyTaskItem
-                key={task.id}
-                task={task}
-                onCheck={() => handleCheck(task.id)}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyWeekly}>
-              <Text style={styles.emptyWeeklyText}>Belum ada jadwal minggu ini</Text>
+            <View>
+              {weekTasks.map((task, index) => (
+                <WeeklyTaskItem
+                  key={task.id}
+                  task={task}
+                  index={index}
+                  onCheck={() => handleCheck(task.id)}
+                />
+              ))}
             </View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(400)} style={styles.emptyWeekly}>
+              <Text style={styles.emptyWeeklyText}>Belum ada jadwal minggu ini</Text>
+            </Animated.View>
           )}
         </Animated.View>
 
@@ -605,6 +631,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.cream,
   },
+  blurHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    backgroundColor: Colors.dailyCardBg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
   scrollView: {
     flex: 1,
   },
@@ -615,8 +651,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingVertical: Spacing.md,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -625,7 +660,7 @@ const styles = StyleSheet.create({
   dateTitle: {
     fontSize: FontSize.xl,
     fontWeight: '700',
-    color: Colors.brownDark,
+    color: Colors.white,
     letterSpacing: -0.3,
   },
   avatar: {
@@ -633,13 +668,13 @@ const styles = StyleSheet.create({
     height: sw(42),
     borderRadius: sw(21),
     borderWidth: 2,
-    borderColor: Colors.brownDark,
+    borderColor: Colors.white,
   },
   avatarPlaceholder: {
     width: sw(42),
     height: sw(42),
     borderRadius: sw(21),
-    backgroundColor: Colors.brownDark,
+    backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },

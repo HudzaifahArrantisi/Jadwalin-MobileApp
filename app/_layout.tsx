@@ -3,7 +3,7 @@
 // ============================================
 
 import { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -15,6 +15,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTaskStore } from '@/store/taskStore';
 import { requestNotificationPermission } from '@/services/notification.service';
 import { Colors } from '@/constants/theme';
+
+// Ignore harmless Firebase connectivity warnings in development
+LogBox.ignoreLogs([
+  'WebChannelConnection RPC',
+  'BloomFilter error',
+]);
 
 // Keep splash visible while loading
 SplashScreen.preventAutoHideAsync();

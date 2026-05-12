@@ -10,14 +10,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { 
+  FadeInDown, FadeIn, 
+  Layout, useSharedValue, 
+  useAnimatedStyle, withSpring 
+} from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { auth, db } from '@/services/firebase';
 import { updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskStore } from '@/store/taskStore';
 import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH } from '@/constants/theme';
+import InteractivePressable from '@/components/InteractivePressable';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -34,6 +40,7 @@ export default function ProfileScreen() {
   const displayPhoto = localPhotoUri || user?.photoURL;
 
   const handleCancel = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setName(user?.name || '');
     setEmail(user?.email || '');
     setJob(user?.job || '');
@@ -44,10 +51,10 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) { Alert.alert('Error', 'Nama tidak boleh kosong'); return; }
-    if (!email.trim()) { Alert.alert('Error', 'Email tidak boleh kosong'); return; }
-
+    
     if (user) {
       try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         if (auth.currentUser) {
           await updateProfile(auth.currentUser, {
             displayName: name.trim(),
@@ -73,17 +80,17 @@ export default function ProfileScreen() {
         setIsEditing(false);
         Alert.alert('Berhasil', 'Profil berhasil diperbarui');
       } catch (err: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Error', 'Gagal memperbarui profil: ' + err.message);
       }
     }
   };
 
-  // Bug 9: Pick photo from gallery
   const handlePickPhoto = async () => {
     try {
       const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permResult.granted) {
-        Alert.alert('Izin Diperlukan', 'Aplikasi membutuhkan akses ke galeri foto untuk mengubah foto profil.');
+        Alert.alert('Izin Diperlukan', 'Aplikasi membutuhkan akses ke galeri foto.');
         return;
       }
 
@@ -95,6 +102,7 @@ export default function ProfileScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setLocalPhotoUri(result.assets[0].uri);
         setIsEditing(true);
       }
@@ -103,7 +111,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // Bug 9: Take photo with camera
   const handleTakePhoto = async () => {
     try {
       const permResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -119,6 +126,7 @@ export default function ProfileScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setLocalPhotoUri(result.assets[0].uri);
         setIsEditing(true);
       }
@@ -128,6 +136,7 @@ export default function ProfileScreen() {
   };
 
   const handlePhotoPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('Ubah Foto Profil', 'Pilih sumber foto', [
       { text: 'Kamera', onPress: handleTakePhoto },
       { text: 'Galeri', onPress: handlePickPhoto },
@@ -136,6 +145,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert('Logout', 'Yakin ingin keluar dari akun?', [
       { text: 'Batal', style: 'cancel' },
       { text: 'Logout', style: 'destructive', onPress: logout },
@@ -148,10 +158,13 @@ export default function ProfileScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: sw(120) }}
           keyboardShouldPersistTaps="handled">
           
-          {/* Profile Header (Elegant Redesign) */}
+          {/* Profile Header */}
           <Animated.View entering={FadeIn.duration(400)} style={styles.profileHeader}>
             <View style={styles.headerBackground} />
-            <View style={styles.avatarContainer}>
+            <Animated.View 
+              entering={FadeInDown.delay(100).springify()}
+              style={styles.avatarContainer}
+            >
               {displayPhoto ? (
                 <Image source={{ uri: displayPhoto }} style={styles.avatar} />
               ) : (
@@ -159,10 +172,10 @@ export default function ProfileScreen() {
                   <Ionicons name="person" size={sw(40)} color={Colors.cream} />
                 </View>
               )}
-              <TouchableOpacity style={styles.editPhotoBtn} activeOpacity={0.8} onPress={handlePhotoPress}>
+              <InteractivePressable style={styles.editPhotoBtn} onPress={handlePhotoPress}>
                 <Ionicons name="camera" size={sw(16)} color={Colors.white} />
-              </TouchableOpacity>
-            </View>
+              </InteractivePressable>
+            </Animated.View>
             <View style={styles.profileInfoBlock}>
               <Text style={styles.profileName}>{user?.name || 'Pengguna'}</Text>
               <Text style={styles.profileEmail}>{user?.email}</Text>
@@ -170,7 +183,7 @@ export default function ProfileScreen() {
           </Animated.View>
 
           {/* Form Section */}
-          <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.formSection}>
+          <Animated.View entering={FadeInDown.delay(200).duration(400).springify()} style={styles.formSection}>
             <View style={styles.formCard}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="person-outline" size={sw(20)} color={Colors.brownDark} />
@@ -187,8 +200,8 @@ export default function ProfileScreen() {
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Email</Text>
                 <TextInput style={[styles.input, { backgroundColor: Colors.cream }]} value={email}
-                  editable={false} // Email typically shouldn't be editable directly without reauth
-                  placeholder="Masukkan email" placeholderTextColor={Colors.textMuted}
+                  editable={false}
+                  placeholderTextColor={Colors.textMuted}
                   keyboardType="email-address" autoCapitalize="none" />
               </View>
 
@@ -208,27 +221,31 @@ export default function ProfileScreen() {
               </View>
 
               {isEditing && (
-                <Animated.View entering={FadeInDown.duration(300)} style={styles.buttonRow}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} activeOpacity={0.7}>
+                <Animated.View 
+                  entering={FadeInDown.duration(300).springify()} 
+                  layout={Layout.springify()}
+                  style={styles.buttonRow}
+                >
+                  <InteractivePressable style={styles.cancelBtn} onPress={handleCancel}>
                     <Text style={styles.cancelBtnText}>Batal</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.7}>
+                  </InteractivePressable>
+                  <InteractivePressable style={styles.saveBtn} onPress={handleSave}>
                     <Text style={styles.saveBtnText}>Simpan</Text>
-                  </TouchableOpacity>
+                  </InteractivePressable>
                 </Animated.View>
               )}
             </View>
           </Animated.View>
 
           {/* Logout Section */}
-          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.logoutSection}>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+          <Animated.View entering={FadeInDown.delay(300).duration(400).springify()} style={styles.logoutSection}>
+            <InteractivePressable style={styles.logoutBtn} onPress={handleLogout} hapticType={Haptics.ImpactFeedbackStyle.Medium}>
               <View style={styles.logoutIconWrapper}>
                 <Ionicons name="log-out-outline" size={sw(22)} color={Colors.danger} />
               </View>
               <Text style={styles.logoutText}>Keluar dari Akun</Text>
               <Ionicons name="chevron-forward" size={sw(18)} color={Colors.textMuted} />
-            </TouchableOpacity>
+            </InteractivePressable>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

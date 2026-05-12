@@ -1,14 +1,17 @@
 // ============================================
-// Jadwalin App — Auth Layout
+// Jadwalin App — Auth Layout (BEIGE EDITION v2)
+// Supports: onboarding, login, register, forgot-password
 // ============================================
 
 import { Stack } from 'expo-router';
 
 export default function AuthLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-      <Stack.Screen name="onboarding" />
+    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
       <Stack.Screen name="login" />
+      <Stack.Screen name="register" />
+      <Stack.Screen name="forgot-password" />
     </Stack>
   );
 }

@@ -1,8 +1,3 @@
-// ============================================
-// Jadwalin App — Tab Navigation (BEIGE EDITION)
-// Bottom tab bar: Home, Note, Kalender, Profile
-// ============================================
-
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View, StyleSheet, TouchableOpacity } from 'react-native';

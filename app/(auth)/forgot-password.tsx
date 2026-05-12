@@ -1,5 +1,5 @@
 // ============================================
-// Jadwalin App — Login Screen (BEIGE EDITION v2)
+// Jadwalin App — Forgot Password (BEIGE EDITION v2)
 // Curved wave design with warm tones
 // ============================================
 
@@ -14,16 +14,15 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   withTiming, FadeInDown, FadeIn,
 } from 'react-native-reanimated';
-import { signInWithEmail } from '@/services/auth.service';
+import { resetPassword } from '@/services/auth.service';
 import { Colors, Spacing, FontSize, Radius, sw, Shadow, SCREEN_WIDTH } from '@/constants/theme';
 
-export default function LoginScreen() {
+export default function ForgotPasswordScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [isSent, setIsSent] = useState(false);
 
   // Animations
   const logoScale = useSharedValue(0.5);
@@ -44,38 +43,29 @@ export default function LoginScreen() {
     transform: [{ scale: buttonScale.value }],
   }));
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Email dan password wajib diisi');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password minimal 6 karakter');
+  const handleSendReset = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Email wajib diisi');
       return;
     }
 
     setIsLoading(true);
     try {
-      await signInWithEmail(email.trim(), password);
-      router.replace('/(tabs)');
+      await resetPassword(email.trim());
+      setIsSent(true);
+      Alert.alert(
+        'Berhasil! ✉️',
+        'Tautan reset password telah dikirim ke email kamu. Silakan cek inbox atau folder spam.',
+        [{ text: 'OK' }]
+      );
     } catch (error: any) {
       let message = 'Terjadi kesalahan';
-      if (error.code === 'auth/invalid-email') message = 'Email tidak valid';
-      else if (error.code === 'auth/user-not-found') message = 'Akun tidak ditemukan';
-      else if (error.code === 'auth/wrong-password') message = 'Password salah';
-      else if (error.code === 'auth/invalid-credential') message = 'Email atau password salah';
-      Alert.alert('Login Gagal', message);
+      if (error.code === 'auth/invalid-email') message = 'Format email tidak valid';
+      else if (error.code === 'auth/user-not-found') message = 'Email tidak terdaftar';
+      Alert.alert('Gagal', message);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleSignIn = () => {
-    Alert.alert(
-      'Google Sign-In',
-      'Google Sign-In membutuhkan development build. Gunakan email/password untuk testing di Expo Go.',
-      [{ text: 'OK' }]
-    );
   };
 
   return (
@@ -93,23 +83,42 @@ export default function LoginScreen() {
           <View style={styles.topWave}>
             <Animated.View style={[styles.logoContainer, logoAnim]}>
               <View style={styles.logoCircle}>
-                <Ionicons name="calendar" size={sw(36)} color={Colors.white} />
-                <title> jadwalin app </title>
+                <Ionicons name="key-outline" size={sw(34)} color={Colors.white} />
               </View>
             </Animated.View>
-            {/* Curved bottom edge */}
             <View style={styles.waveCurve} />
           </View>
 
-          {/* ── Form Section (White/Cream) ── */}
+          {/* ── Form Section ── */}
           <View style={styles.formSection}>
+            {/* Back Button */}
+            <Animated.View entering={FadeIn.delay(100).duration(300)}>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.backButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={sw(22)} color={Colors.brownDark} />
+              </TouchableOpacity>
+            </Animated.View>
+
             <Animated.View entering={FadeIn.delay(200).duration(500)}>
-              <Text style={styles.formTitle}>Login</Text>
+              <Text style={styles.formTitle}>Lupa Password</Text>
               <Text style={styles.formSubtitle}>
-                Selamat datang kembali,{'\n'}
-                Masuk untuk melanjutkan jadwalmu
+                Masukkan alamat email yang terdaftar.{'\n'}
+                Kami akan mengirimkan tautan untuk mereset kata sandi kamu.
               </Text>
             </Animated.View>
+
+            {/* Success State */}
+            {isSent && (
+              <Animated.View entering={FadeInDown.duration(400)} style={styles.successBanner}>
+                <Ionicons name="checkmark-circle" size={sw(22)} color={Colors.checkGreen} />
+                <Text style={styles.successText}>
+                  Tautan reset telah dikirim! Cek email kamu.
+                </Text>
+              </Animated.View>
+            )}
 
             {/* Email Input */}
             <Animated.View
@@ -124,7 +133,7 @@ export default function LoginScreen() {
                   placeholder="email@contoh.com"
                   placeholderTextColor={Colors.textMuted}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(text) => { setEmail(text); setIsSent(false); }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -132,47 +141,13 @@ export default function LoginScreen() {
               </View>
             </Animated.View>
 
-            {/* Password Input */}
-            <Animated.View
-              entering={FadeInDown.delay(400).duration(400)}
-              style={styles.inputWrapper}
-            >
-              <View style={styles.labelRow}>
-                <Text style={styles.inputLabel}>Password</Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                  <Text style={styles.forgotLink}>Lupa password?</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Masukkan password"
-                  placeholderTextColor={Colors.textMuted}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={sw(20)}
-                    color={Colors.brown}
-                  />
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-
-            {/* Sign In Button */}
-            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={{ marginTop: Spacing.lg }}>
+            {/* Send Link Button */}
+            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: Spacing.lg }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
                 onPressIn={() => { buttonScale.value = withSpring(0.97); }}
                 onPressOut={() => { buttonScale.value = withSpring(1); }}
-                onPress={handleLogin}
+                onPress={handleSendReset}
                 disabled={isLoading}
                 activeOpacity={1}
                 style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
@@ -180,42 +155,26 @@ export default function LoginScreen() {
                 {isLoading ? (
                   <ActivityIndicator color={Colors.white} size="small" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Sign In</Text>
+                  <>
+                    <Ionicons name="send" size={sw(18)} color={Colors.white} />
+                    <Text style={styles.primaryButtonText}>Kirim Tautan</Text>
+                  </>
                 )}
               </TouchableOpacity>
             </Animated.View>
           </Animated.View>
+        </View>
 
-          {/* Divider */}
-            <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>atau</Text>
-              <View style={styles.divider} />
-            </Animated.View>
-
-            {/* Google Sign In */}
-            <Animated.View entering={FadeInDown.delay(650).duration(400)}>
-              <TouchableOpacity
-                style={styles.googleButton}
-                onPress={handleGoogleSignIn}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="logo-google" size={sw(18)} color={Colors.brownDark} />
-                <Text style={styles.googleButtonText}>Masuk dengan Google</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-
-          {/* ── Bottom Wave Section (Beige) ── */}
+          {/* ── Bottom Wave Section ── */}
           <View style={styles.bottomWave}>
             <View style={styles.bottomWaveCurve} />
-            <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.bottomContent}>
+            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.bottomContent}>
               <TouchableOpacity
-                onPress={() => router.push('/(auth)/register')}
+                onPress={() => router.back()}
                 style={styles.toggleRow}
               >
-                <Text style={styles.toggleText}>Belum punya akun? </Text>
-                <Text style={styles.toggleLink}>Buat akun</Text>
+                <Text style={styles.toggleText}>Ingat password? </Text>
+                <Text style={styles.toggleLink}>Sign In</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -270,8 +229,20 @@ const styles = StyleSheet.create({
   // ─── Form ───
   formSection: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: sw(40),
+    paddingTop: sw(36),
+    flex: 1,
     zIndex: 0,
+  },
+  backButton: {
+    width: sw(40),
+    height: sw(40),
+    borderRadius: Radius.md,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
   },
   formTitle: {
     fontSize: sw(28),
@@ -286,13 +257,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     lineHeight: sw(22),
   },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: '#E8F5E9',
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.lg,
+  },
+  successText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    color: Colors.checkGreen,
+    fontWeight: '600',
+  },
   inputWrapper: {
     marginBottom: Spacing.md,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   inputLabel: {
     fontSize: FontSize.xs,
@@ -301,12 +282,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  forgotLink: {
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-    color: Colors.brownDark,
-    marginBottom: Spacing.xs,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -328,8 +303,10 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   primaryButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.sm,
     height: sw(52),
     backgroundColor: Colors.brownDark,
     borderRadius: Radius.xl,
@@ -341,43 +318,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.lg,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.inputBorder,
-  },
-  dividerText: {
-    marginHorizontal: Spacing.md,
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: sw(52),
-    borderRadius: Radius.xl,
-    borderWidth: 1.5,
-    borderColor: Colors.inputBorder,
-    backgroundColor: Colors.white,
-    gap: Spacing.sm,
-  },
-  googleButtonText: {
-    fontSize: FontSize.md,
-    fontWeight: '600',
-    color: Colors.brownDark,
-  },
 
   // ─── Bottom Wave ───
   bottomWave: {
     flex: 1,
     justifyContent: 'flex-end',
-    minHeight: sw(100),
+    minHeight: sw(120),
     backgroundColor: Colors.beige,
     marginTop: sw(30),
     position: 'relative',

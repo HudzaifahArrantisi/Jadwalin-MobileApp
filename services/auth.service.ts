@@ -9,6 +9,7 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendPasswordResetEmail,
   User,
   GoogleAuthProvider,
   signInWithCredential,
@@ -100,6 +101,11 @@ export async function registerWithEmail(
 /** Sign out */
 export async function logout(): Promise<void> {
   await signOut(auth);
+}
+
+/** Send password reset email */
+export async function resetPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email);
 }
 
 /** Listen to auth state changes */

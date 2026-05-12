@@ -1,5 +1,5 @@
 // ============================================
-// Jadwalin App — Login Screen (BEIGE EDITION v2)
+// Jadwalin App — Register Screen (BEIGE EDITION v2)
 // Curved wave design with warm tones
 // ============================================
 
@@ -14,16 +14,19 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   withTiming, FadeInDown, FadeIn,
 } from 'react-native-reanimated';
-import { signInWithEmail } from '@/services/auth.service';
+import { registerWithEmail } from '@/services/auth.service';
 import { Colors, Spacing, FontSize, Radius, sw, Shadow, SCREEN_WIDTH } from '@/constants/theme';
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
   const router = useRouter();
 
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Animations
   const logoScale = useSharedValue(0.5);
@@ -44,7 +47,11 @@ export default function LoginScreen() {
     transform: [{ scale: buttonScale.value }],
   }));
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Nama lengkap wajib diisi');
+      return;
+    }
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Email dan password wajib diisi');
       return;
@@ -53,29 +60,24 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Password minimal 6 karakter');
       return;
     }
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Konfirmasi password tidak cocok');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      await signInWithEmail(email.trim(), password);
+      await registerWithEmail(email.trim(), password, name.trim());
       router.replace('/(tabs)');
     } catch (error: any) {
       let message = 'Terjadi kesalahan';
       if (error.code === 'auth/invalid-email') message = 'Email tidak valid';
-      else if (error.code === 'auth/user-not-found') message = 'Akun tidak ditemukan';
-      else if (error.code === 'auth/wrong-password') message = 'Password salah';
-      else if (error.code === 'auth/invalid-credential') message = 'Email atau password salah';
-      Alert.alert('Login Gagal', message);
+      else if (error.code === 'auth/email-already-in-use') message = 'Email sudah terdaftar';
+      else if (error.code === 'auth/weak-password') message = 'Password terlalu lemah';
+      Alert.alert('Registrasi Gagal', message);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleSignIn = () => {
-    Alert.alert(
-      'Google Sign-In',
-      'Google Sign-In membutuhkan development build. Gunakan email/password untuk testing di Expo Go.',
-      [{ text: 'OK' }]
-    );
   };
 
   return (
@@ -93,29 +95,39 @@ export default function LoginScreen() {
           <View style={styles.topWave}>
             <Animated.View style={[styles.logoContainer, logoAnim]}>
               <View style={styles.logoCircle}>
-                <Ionicons name="calendar" size={sw(36)} color={Colors.white} />
-                <title> jadwalin app </title>
+                <Ionicons name="calendar" size={sw(32)} color={Colors.white} />
               </View>
             </Animated.View>
-            {/* Curved bottom edge */}
             <View style={styles.waveCurve} />
           </View>
 
-          {/* ── Form Section (White/Cream) ── */}
+          {/* ── Form Section ── */}
           <View style={styles.formSection}>
             <Animated.View entering={FadeIn.delay(200).duration(500)}>
-              <Text style={styles.formTitle}>Login</Text>
+              <Text style={styles.formTitle}>Buat Akun</Text>
               <Text style={styles.formSubtitle}>
-                Selamat datang kembali,{'\n'}
-                Masuk untuk melanjutkan jadwalmu
+                Daftarkan dirimu untuk mulai{'\n'}mengelola jadwalmu
               </Text>
             </Animated.View>
 
-            {/* Email Input */}
-            <Animated.View
-              entering={FadeInDown.delay(300).duration(400)}
-              style={styles.inputWrapper}
-            >
+            {/* Full Name */}
+            <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Nama Lengkap</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Masukkan nama lengkap"
+                  placeholderTextColor={Colors.textMuted}
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                />
+              </View>
+            </Animated.View>
+
+            {/* Email */}
+            <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>Email</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
@@ -132,22 +144,14 @@ export default function LoginScreen() {
               </View>
             </Animated.View>
 
-            {/* Password Input */}
-            <Animated.View
-              entering={FadeInDown.delay(400).duration(400)}
-              style={styles.inputWrapper}
-            >
-              <View style={styles.labelRow}>
-                <Text style={styles.inputLabel}>Password</Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                  <Text style={styles.forgotLink}>Lupa password?</Text>
-                </TouchableOpacity>
-              </View>
+            {/* Password */}
+            <Animated.View entering={FadeInDown.delay(450).duration(400)} style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Password</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="lock-closed-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Masukkan password"
+                  placeholder="Minimal 6 karakter"
                   placeholderTextColor={Colors.textMuted}
                   value={password}
                   onChangeText={setPassword}
@@ -166,13 +170,39 @@ export default function LoginScreen() {
               </View>
             </Animated.View>
 
-            {/* Sign In Button */}
-            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={{ marginTop: Spacing.lg }}>
+            {/* Confirm Password */}
+            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Konfirmasi Password</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="shield-checkmark-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ulangi password"
+                  placeholderTextColor={Colors.textMuted}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirm}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirm(!showConfirm)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
+                    size={sw(20)}
+                    color={Colors.brown}
+                  />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            {/* Create Account Button */}
+            <Animated.View entering={FadeInDown.delay(550).duration(400)} style={{ marginTop: Spacing.md }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
                 onPressIn={() => { buttonScale.value = withSpring(0.97); }}
                 onPressOut={() => { buttonScale.value = withSpring(1); }}
-                onPress={handleLogin}
+                onPress={handleRegister}
                 disabled={isLoading}
                 activeOpacity={1}
                 style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
@@ -180,42 +210,23 @@ export default function LoginScreen() {
                 {isLoading ? (
                   <ActivityIndicator color={Colors.white} size="small" />
                 ) : (
-                  <Text style={styles.primaryButtonText}>Sign In</Text>
+                  <Text style={styles.primaryButtonText}>Buat Akun</Text>
                 )}
               </TouchableOpacity>
             </Animated.View>
           </Animated.View>
+        </View>
 
-          {/* Divider */}
-            <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>atau</Text>
-              <View style={styles.divider} />
-            </Animated.View>
-
-            {/* Google Sign In */}
-            <Animated.View entering={FadeInDown.delay(650).duration(400)}>
-              <TouchableOpacity
-                style={styles.googleButton}
-                onPress={handleGoogleSignIn}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="logo-google" size={sw(18)} color={Colors.brownDark} />
-                <Text style={styles.googleButtonText}>Masuk dengan Google</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-
-          {/* ── Bottom Wave Section (Beige) ── */}
+          {/* ── Bottom Wave Section ── */}
           <View style={styles.bottomWave}>
             <View style={styles.bottomWaveCurve} />
-            <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.bottomContent}>
+            <Animated.View entering={FadeInDown.delay(650).duration(400)} style={styles.bottomContent}>
               <TouchableOpacity
-                onPress={() => router.push('/(auth)/register')}
+                onPress={() => router.back()}
                 style={styles.toggleRow}
               >
-                <Text style={styles.toggleText}>Belum punya akun? </Text>
-                <Text style={styles.toggleLink}>Buat akun</Text>
+                <Text style={styles.toggleText}>Sudah punya akun? </Text>
+                <Text style={styles.toggleLink}>Sign In</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -237,8 +248,8 @@ const styles = StyleSheet.create({
   // ─── Top Wave ───
   topWave: {
     backgroundColor: Colors.beige,
-    paddingTop: sw(60),
-    paddingBottom: sw(50),
+    paddingTop: sw(50),
+    paddingBottom: sw(40),
     alignItems: 'center',
     position: 'relative',
   },
@@ -247,9 +258,9 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   logoCircle: {
-    width: sw(72),
-    height: sw(72),
-    borderRadius: sw(36),
+    width: sw(64),
+    height: sw(64),
+    borderRadius: sw(32),
     backgroundColor: Colors.brownDark,
     alignItems: 'center',
     justifyContent: 'center',
@@ -270,7 +281,7 @@ const styles = StyleSheet.create({
   // ─── Form ───
   formSection: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: sw(40),
+    paddingTop: sw(36),
     zIndex: 0,
   },
   formTitle: {
@@ -283,16 +294,11 @@ const styles = StyleSheet.create({
   formSubtitle: {
     fontSize: FontSize.md,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     lineHeight: sw(22),
   },
   inputWrapper: {
     marginBottom: Spacing.md,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   inputLabel: {
     fontSize: FontSize.xs,
@@ -301,12 +307,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  forgotLink: {
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-    color: Colors.brownDark,
-    marginBottom: Spacing.xs,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -340,37 +340,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: '700',
     letterSpacing: 0.5,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.lg,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.inputBorder,
-  },
-  dividerText: {
-    marginHorizontal: Spacing.md,
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: sw(52),
-    borderRadius: Radius.xl,
-    borderWidth: 1.5,
-    borderColor: Colors.inputBorder,
-    backgroundColor: Colors.white,
-    gap: Spacing.sm,
-  },
-  googleButtonText: {
-    fontSize: FontSize.md,
-    fontWeight: '600',
-    color: Colors.brownDark,
   },
 
   // ─── Bottom Wave ───
