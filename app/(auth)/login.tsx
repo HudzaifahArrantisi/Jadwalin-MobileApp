@@ -1,8 +1,3 @@
-// ============================================
-// Jadwalin App — Login Screen (BEIGE EDITION v2)
-// Curved wave design with warm tones
-// ============================================
-
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,

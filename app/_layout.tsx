@@ -1,7 +1,3 @@
-// ============================================
-// Jadwalin App — Root Layout (BEIGE EDITION)
-// ============================================
-
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
