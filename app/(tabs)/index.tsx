@@ -1,11 +1,3 @@
-// ============================================
-// Jadwalin App — Home Screen (BEIGE EDITION)
-// Bug 4: Firebase sync fixed in task.service.ts
-// Bug 5: Scrollable week calendar with left/right scroll
-// Bug 6: Daily section dropdown shows mini calendar
-// Bug 7: Weekly list shows tasks within current week only
-// ============================================
-
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
