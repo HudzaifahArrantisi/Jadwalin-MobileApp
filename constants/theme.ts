@@ -32,58 +32,60 @@ export const normalize = (size: number) => {
 
 export const Colors = {
   // Primary backgrounds
-  cream: '#FFF8F0',          // Main page background
-  beige: '#F5E6D3',          // Header/profile top section
-  beigeDark: '#D4B896',      // Darker beige accent
-  brown: '#8B7355',          // Brown text/accents
-  brownDark: '#5C4A32',      // Dark brown for important text
-  brownLight: '#C4A882',     // Light brown cards
+  cream: '#FFFDF9',          // Cloud Cream (Main page background)
+  beige: '#F8F3ED',          // Soft Sand (Header background)
+  beigeDark: '#E8D9C5',      // Almond (Tab bar pill)
+  brown: '#9C8B75',          // Driftwood (Brown text/accents)
+  brownDark: '#6B5D4F',      // Espresso Muted (Important text/buttons)
+  brownLight: '#D4C4AD',     // Sand Dollar (Light brown cards)
 
-  // Activity card section (daily tasks - brown area)
-  dailyCardBg: '#C9B99A',    // The brownish card background
-  dailyCardBorder: '#B8A88A',
+  // Activity card section (daily tasks - stone area)
+  dailyCardBg: '#C4B8A4',    // Warm Stone background
+  dailyCardBorder: '#B5A894',
 
-  // Pastel green for weekly list items
-  pastelGreen: '#D4E8C2',    // Light pastel green for list items
-  pastelGreenDark: '#B8D4A0', // Slightly darker green
+  // Pastel colors for lists/notes
+  pastelGreen: '#E2EDDA',    // Sage Mist
+  pastelGreenDark: '#C8D9BC', // Sage
+  pastelRose: '#FDF0ED',     // Dusty Rose (BARU)
+  pastelBlue: '#E4ECF3',     // Mist Blue (BARU)
 
-  // Accent colors
-  checkGreen: '#4CAF50',     // Green checkmark color
+  // Status colors (Desaturated/Pastel)
+  checkGreen: '#7FB685',     // Soft Fern
+  success: '#7FB685',
+  warning: '#D4A96A',
+  danger: '#D4816B',         // Terracotta (Soft danger)
+  info: '#9AB3D4',
+
+  // Basic colors
   white: '#FFFFFF',
-  black: '#1A1A1A',
-  textPrimary: '#2C2C2C',
-  textSecondary: '#6B6B6B',
-  textMuted: '#999999',
+  black: '#2D2B28',          // Charcoal Warm
+  textPrimary: '#2D2B28',
+  textSecondary: '#7A7570',  // Pebble
+  textMuted: '#A8A29E',      // Stone
   textLight: '#FFFFFF',
 
   // Inputs & borders
   inputBg: '#FFFFFF',
-  inputBorder: '#E0D5C7',
-  borderLight: '#E8DDD0',
+  inputBorder: '#EFE9E1',    // Linen
+  borderLight: '#EDE8E1',
 
   // Tab bar
-  tabBarBg: '#FFF8F0',
-  tabBarActive: '#5C4A32',
-  tabBarInactive: '#B0A090',
+  tabBarBg: '#FFFDF9',
+  tabBarActive: '#6B5D4F',
+  tabBarInactive: '#A8A29E',
 
   // Calendar
-  calendarHeader: '#F0E4D4',
-  calendarSelected: '#8B7355',
-  calendarToday: '#D4B896',
-  calendarDot: '#7B9B6B',
-
-  // Status
-  success: '#4CAF50',
-  warning: '#FF9800',
-  danger: '#F44336',
-  info: '#2196F3',
+  calendarHeader: '#F8F3ED',
+  calendarSelected: '#6B5D4F',
+  calendarToday: '#D4C4AD',
+  calendarDot: '#7FB685',
 
   // Overlay
-  overlay: 'rgba(0, 0, 0, 0.4)',
+  overlay: 'rgba(45, 43, 40, 0.4)',
 
-  // Profile section gradient
-  profileBg: '#ECD9C6',
-  profileFormBg: '#D4B896',
+  // Profile section
+  profileBg: '#F5EDE3',
+  profileFormBg: '#E8D9C5',
 } as const;
 
 // ─── Spacing System (responsive) ───
@@ -139,25 +141,25 @@ export const FontWeight = {
 
 export const Shadow = {
   sm: {
-    shadowColor: '#8B7355',
+    shadowColor: '#6B5D4F',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 1,
   },
   md: {
-    shadowColor: '#8B7355',
+    shadowColor: '#6B5D4F',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
   },
   lg: {
-    shadowColor: '#5C4A32',
+    shadowColor: '#2D2B28',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 3,
   },
 } as const;
 

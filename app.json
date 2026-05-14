@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "minSdkVersion": 24,
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -56,3 +57,4 @@
     "owner": "candalena"
   }
 }
+

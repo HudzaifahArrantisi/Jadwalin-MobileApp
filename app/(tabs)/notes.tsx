@@ -56,7 +56,7 @@ function NoteDetailModal({
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={detailStyles.keyboardView}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           <View style={[detailStyles.container, { paddingTop: insets.top + sw(10) }]}>
             {/* Back Button */}
@@ -90,6 +90,7 @@ function NoteDetailModal({
                     <InteractivePressable
                       style={detailStyles.itemRow}
                       onPress={() => handleToggle(item.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       onLongPress={() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
                         Alert.alert('Hapus Item', `Hapus "${item.text}"?`, [
@@ -144,11 +145,17 @@ const detailStyles = StyleSheet.create({
   cardHeader: { marginBottom: Spacing.md },
   cardTitle: { fontSize: FontSize.xxl, fontWeight: '800', color: Colors.textPrimary },
   itemsScroll: { flex: 1 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: sw(8), gap: Spacing.sm },
-  itemDot: { width: sw(12), height: sw(12), borderRadius: sw(6), backgroundColor: Colors.textPrimary },
-  itemDotCompleted: { backgroundColor: Colors.checkGreen },
-  itemText: { fontSize: FontSize.md, color: Colors.textPrimary, flex: 1 },
-  itemTextCompleted: { textDecorationLine: 'line-through', color: Colors.textMuted },
+  itemRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: sw(12), 
+    paddingHorizontal: sw(4),
+    gap: Spacing.sm 
+  },
+  itemDot: { width: sw(14), height: sw(14), borderRadius: sw(7), backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brownDark },
+  itemDotCompleted: { backgroundColor: Colors.checkGreen, borderColor: Colors.checkGreen },
+  itemText: { fontSize: FontSize.md, color: Colors.textPrimary, flex: 1, fontWeight: '500' },
+  itemTextCompleted: { textDecorationLine: 'line-through', color: Colors.textMuted, opacity: 0.6 },
   inputRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)',
@@ -286,6 +293,8 @@ export default function NotesScreen() {
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [selectedNote, setSelectedNote] = useState<NoteList | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
   const handleCreateNote = async (title: string, items: string[]) => {
     try {
@@ -315,46 +324,97 @@ export default function NotesScreen() {
 
   const handleAddItemToNote = async (text: string) => {
     if (!selectedNote) return;
+    const newItem = { id: Date.now().toString(), text, completed: false, order: selectedNote.items.length };
+    
+    // Update locally for immediate feedback
+    setSelectedNote(prev => prev ? ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }) : null);
+
     try {
-      const newItem = { id: Date.now().toString(), text, completed: false, order: selectedNote.items.length };
       await editNote(selectedNote.id, {
         items: [...selectedNote.items, newItem]
       });
-      // Refresh selectedNote to show new item in modal
-      const updatedNote = notes.find(n => n.id === selectedNote.id);
-      if (updatedNote) setSelectedNote(updatedNote);
-    } catch (error: any) { Alert.alert('Error', error.message); }
+    } catch (error: any) { 
+      Alert.alert('Error', error.message || 'Gagal menambah item'); 
+      // Refresh to sync if error occurs
+      const synced = notes.find(n => n.id === selectedNote.id);
+      if (synced) setSelectedNote(synced);
+    }
   };
 
   const handleToggleItemInDetail = async (itemId: string) => {
     if (!selectedNote) return;
+    
+    // Update locally for immediate feedback
+    setSelectedNote(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        items: prev.items.map(item => 
+          item.id === itemId ? { ...item, completed: !item.completed } : item
+        )
+      };
+    });
+
     try {
       await toggleNoteItem(selectedNote.id, itemId);
-      // Refresh selectedNote
-      const updatedNote = notes.find(n => n.id === selectedNote.id);
-      if (updatedNote) setSelectedNote(updatedNote);
-    } catch (error: any) { Alert.alert('Error', error.message); }
+    } catch (error: any) { 
+      Alert.alert('Error', error.message);
+      // Refresh to sync if error occurs
+      const synced = notes.find(n => n.id === selectedNote.id);
+      if (synced) setSelectedNote(synced);
+    }
   };
 
   const handleDeleteItemInDetail = async (itemId: string) => {
     if (!selectedNote) return;
+    
+    // Update locally for immediate feedback
+    setSelectedNote(prev => prev ? ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== itemId)
+    }) : null);
+
     try {
       await editNote(selectedNote.id, {
         items: selectedNote.items.filter(item => item.id !== itemId)
       });
-      // Refresh selectedNote
-      const updatedNote = notes.find(n => n.id === selectedNote.id);
-      if (updatedNote) setSelectedNote(updatedNote);
-    } catch (error: any) { Alert.alert('Error', error.message); }
+    } catch (error: any) { 
+      Alert.alert('Error', error.message);
+      // Refresh to sync if error occurs
+      const synced = notes.find(n => n.id === selectedNote.id);
+      if (synced) setSelectedNote(synced);
+    }
+  };
+
+  const toggleSelection = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedNoteIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNoteIds.length === 0) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert('Hapus Note', `Hapus ${selectedNoteIds.length} note terpilih?`, [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Hapus', style: 'destructive', onPress: async () => {
+        try {
+          for (const id of selectedNoteIds) {
+            await removeNote(id);
+          }
+          setIsSelectionMode(false);
+          setSelectedNoteIds([]);
+        } catch (error: any) { Alert.alert('Error', error.message); }
+      }},
+    ]);
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Animated.View entering={FadeIn.duration(300)}>
-        <InteractivePressable style={styles.backBtn} onPress={() => {}}>
-          <Ionicons name="arrow-back" size={sw(24)} color={Colors.textPrimary} />
-        </InteractivePressable>
-      </Animated.View>
+    <View style={[styles.container, { paddingTop: insets.top + Spacing.md }]}>
 
       <Animated.View entering={FadeInDown.delay(100).duration(500).springify()} style={styles.writeSection}>
         <View style={styles.writeSectionHeader}>
@@ -368,7 +428,19 @@ export default function NotesScreen() {
 
       <ScrollView style={styles.noteList} showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: sw(120) }}>
-        <Text style={styles.noteListTitle}>Daftar Note</Text>
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.noteListTitle}>Daftar Note</Text>
+          {notes.length > 0 && (
+            <InteractivePressable 
+              onPress={() => {
+                setIsSelectionMode(!isSelectionMode);
+                setSelectedNoteIds([]);
+              }}
+            >
+              <Text style={styles.editBtnText}>{isSelectionMode ? 'Batal' : 'Pilih'}</Text>
+            </InteractivePressable>
+          )}
+        </View>
         {notes.length === 0 ? (
           <Animated.View entering={FadeIn.duration(500)} style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={sw(48)} color={Colors.textMuted} />
@@ -383,19 +455,49 @@ export default function NotesScreen() {
                 layout={Layout.springify()}
               >
                 <InteractivePressable 
-                  style={styles.noteItem} 
-                  onPress={() => handleOpenDetail(note)}
-                  onLongPress={() => handleDeleteNote(note.id)}
+                  style={[styles.noteItem, isSelectionMode && selectedNoteIds.includes(note.id) && styles.noteItemSelected]} 
+                  onPress={() => isSelectionMode ? toggleSelection(note.id) : handleOpenDetail(note)}
+                  onLongPress={() => {
+                    if (!isSelectionMode) {
+                      setIsSelectionMode(true);
+                      setSelectedNoteIds([note.id]);
+                    }
+                  }}
                 >
+                  {isSelectionMode && (
+                    <Ionicons 
+                      name={selectedNoteIds.includes(note.id) ? "checkbox" : "square-outline"} 
+                      size={sw(24)} 
+                      color={selectedNoteIds.includes(note.id) ? Colors.brown : Colors.textMuted} 
+                      style={{ marginRight: Spacing.sm }}
+                    />
+                  )}
                   <View style={styles.noteItemDot} />
                   <Text style={styles.noteItemTitle} numberOfLines={1}>{note.title}</Text>
-                  <Ionicons name="chevron-forward" size={sw(20)} color={Colors.textSecondary} />
+                  {!isSelectionMode && <Ionicons name="chevron-forward" size={sw(20)} color={Colors.textSecondary} />}
                 </InteractivePressable>
               </Animated.View>
             ))}
           </View>
         )}
       </ScrollView>
+
+      {isSelectionMode && (
+        <Animated.View entering={FadeInUp} style={[styles.selectionBar, { bottom: (insets.bottom || 0) + sw(100) }]}>
+          <InteractivePressable onPress={() => {
+            if (selectedNoteIds.length === notes.length) setSelectedNoteIds([]);
+            else setSelectedNoteIds(notes.map(n => n.id));
+          }}>
+            <Text style={styles.selectionBarBtn}>
+              {selectedNoteIds.length === notes.length ? 'Batal Semua' : 'Pilih Semua'}
+            </Text>
+          </InteractivePressable>
+          <Text style={styles.selectionBarCount}>{selectedNoteIds.length} Terpilih</Text>
+          <InteractivePressable onPress={handleBulkDelete} disabled={selectedNoteIds.length === 0}>
+            <Text style={[styles.selectionBarBtn, { color: selectedNoteIds.length > 0 ? 'red' : Colors.textMuted }]}>Hapus</Text>
+          </InteractivePressable>
+        </Animated.View>
+      )}
 
       <CreateNoteSheet visible={showCreateSheet} onClose={() => setShowCreateSheet(false)} onSave={handleCreateNote} />
       <NoteDetailModal visible={showDetail} note={selectedNote}
@@ -408,15 +510,27 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.cream },
   backBtn: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
-  writeSection: { backgroundColor: Colors.dailyCardBg, marginHorizontal: Spacing.md, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadow.md },
+  writeSection: { backgroundColor: Colors.dailyCardBg, marginHorizontal: Spacing.md, borderRadius: Radius.xxl, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadow.md },
   writeSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
-  writeSectionTitle: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.textPrimary },
+  writeSectionTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.textPrimary },
   writeSectionHint: { fontSize: FontSize.sm, color: Colors.textSecondary },
   noteList: { flex: 1, paddingHorizontal: Spacing.md },
   noteListTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md, paddingHorizontal: sw(4) },
   noteItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.pastelGreen, borderRadius: Radius.xl, paddingHorizontal: Spacing.md, paddingVertical: sw(16), marginBottom: Spacing.sm, ...Shadow.sm },
   noteItemDot: { width: sw(8), height: sw(8), borderRadius: sw(4), backgroundColor: Colors.textMuted, marginRight: Spacing.sm },
-  noteItemTitle: { flex: 1, fontSize: FontSize.md, fontWeight: '500', color: Colors.textPrimary },
+  noteItemTitle: { flex: 1, fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary },
   emptyState: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.sm },
   emptyText: { fontSize: FontSize.md, color: Colors.textMuted },
+  listHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, paddingHorizontal: sw(4) },
+  editBtnText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.brown },
+  noteItemSelected: { borderColor: Colors.brown, borderWidth: 1, backgroundColor: Colors.white },
+  selectionBar: {
+    position: 'absolute', left: Spacing.md, right: Spacing.md,
+    backgroundColor: Colors.white, borderRadius: Radius.xxl,
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    ...Shadow.lg,
+  },
+  selectionBarBtn: { fontSize: FontSize.md, fontWeight: '700', color: Colors.brown },
+  selectionBarCount: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary },
 });
