@@ -1,15 +1,18 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
+
 buildscript {
   repositories {
     google()
     mavenCentral()
   }
   dependencies {
+        classpath 'com.google.gms:google-services:4.4.1'
     classpath('com.android.tools.build:gradle')
     classpath('com.facebook.react:react-native-gradle-plugin')
     classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
   }
 }
+
 allprojects {
   repositories {
     google()
@@ -17,21 +20,30 @@ allprojects {
     maven { url 'https://www.jitpack.io' }
   }
 }
+
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+// ── Jadwalin: Force minSdkVersion 24 on ALL subprojects (libraries + CMake) ──
 subprojects {
-  plugins.withId('com.android.library') {
-    android {
-      defaultConfig {
-        minSdkVersion 24
-      }
+    plugins.withType(com.android.build.gradle.LibraryPlugin) {
+        android {
+            if (defaultConfig.minSdkVersion == null || defaultConfig.minSdkVersion.apiLevel < 24) {
+                defaultConfig.minSdkVersion 24
+            }
+            // Force CMake-level minimum API to 24
+            defaultConfig.externalNativeBuild {
+                cmake {
+                    arguments "-DANDROID_PLATFORM=android-24"
+                }
+            }
+        }
     }
-  }
-  plugins.withId('com.android.application') {
-    android {
-      defaultConfig {
-        minSdkVersion 24
-      }
+    plugins.withType(com.android.build.gradle.AppPlugin) {
+        android {
+            if (defaultConfig.minSdkVersion == null || defaultConfig.minSdkVersion.apiLevel < 24) {
+                defaultConfig.minSdkVersion 24
+            }
+        }
     }
-  }
 }

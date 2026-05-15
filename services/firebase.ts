@@ -19,7 +19,7 @@ import {
   getReactNativePersistence,
   Auth,
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ──── Firebase Config ────
@@ -48,7 +48,14 @@ try {
   auth = getAuth(app);
 }
 
-// Initialize Firestore
-const db = getFirestore(app);
+// Initialize Firestore with long-polling to prevent WebChannelConnection stream errors
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  });
+} catch {
+  db = getFirestore(app);
+}
 
 export { app, auth, db };

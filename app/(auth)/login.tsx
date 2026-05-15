@@ -9,7 +9,8 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   withTiming, FadeInDown, FadeIn,
 } from 'react-native-reanimated';
-import { signInWithEmail } from '@/services/auth.service';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { signInWithEmail, signInWithGoogle } from '@/services/auth.service';
 import { Colors, Spacing, FontSize, Radius, sw, Shadow, SCREEN_WIDTH } from '@/constants/theme';
 
 export default function LoginScreen() {
@@ -65,12 +66,46 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    Alert.alert(
-      'Google Sign-In',
-      'Google Sign-In membutuhkan development build. Gunakan email/password untuk testing di Expo Go.',
-      [{ text: 'OK' }]
-    );
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // Configure Google Sign-In on mount
+  useEffect(() => {
+    GoogleSignin.configure({
+      // webClientId from Firebase Console > Authentication > Sign-in method > Google
+      // This is the "Web client ID" (NOT Android client ID)
+      webClientId: '55725704462-sbcnip5b0o9rqvck360ak16g4hm7qrfc.apps.googleusercontent.com',
+    });
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const signInResult = await GoogleSignin.signIn();
+
+      // Get the idToken from the sign-in result
+      const idToken = signInResult?.data?.idToken;
+      if (!idToken) {
+        throw new Error('Google Sign-In berhasil tapi tidak mendapat token.');
+      }
+
+      // Pass idToken to Firebase auth
+      await signInWithGoogle(idToken);
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled — do nothing
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        Alert.alert('Info', 'Proses sign-in sedang berjalan...');
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Error', 'Google Play Services tidak tersedia di perangkat ini.');
+      } else {
+        console.error('Google Sign-In error:', error);
+        Alert.alert('Google Sign-In Gagal', error.message || 'Terjadi kesalahan saat sign-in dengan Google.');
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   return (
@@ -89,7 +124,7 @@ export default function LoginScreen() {
             <Animated.View style={[styles.logoContainer, logoAnim]}>
               <View style={styles.logoCircle}>
                 <Ionicons name="calendar" size={sw(36)} color={Colors.white} />
-                <title> jadwalin app </title>
+                <Text style={{ color: Colors.white, fontSize: sw(10), fontWeight: 'bold', marginTop: sw(2) }}>Jadwalin</Text>
               </View>
             </Animated.View>
             {/* Curved bottom edge */}
@@ -191,12 +226,19 @@ export default function LoginScreen() {
             {/* Google Sign In */}
             <Animated.View entering={FadeInDown.delay(650).duration(400)}>
               <TouchableOpacity
-                style={styles.googleButton}
+                style={[styles.googleButton, { opacity: isGoogleLoading ? 0.7 : 1 }]}
                 onPress={handleGoogleSignIn}
                 activeOpacity={0.7}
+                disabled={isGoogleLoading || isLoading}
               >
-                <Ionicons name="logo-google" size={sw(18)} color={Colors.brownDark} />
-                <Text style={styles.googleButtonText}>Masuk dengan Google</Text>
+                {isGoogleLoading ? (
+                  <ActivityIndicator color={Colors.brownDark} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-google" size={sw(18)} color={Colors.brownDark} />
+                    <Text style={styles.googleButtonText}>Masuk dengan Google</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </Animated.View>
           </View>

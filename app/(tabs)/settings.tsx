@@ -98,12 +98,14 @@ export default function ProfileScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.7,
+        quality: 0.2,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets[0] && result.assets[0].base64) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setLocalPhotoUri(result.assets[0].uri);
+        const base64Uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        setLocalPhotoUri(base64Uri);
         setIsEditing(true);
       }
     } catch (error) {
@@ -122,12 +124,14 @@ export default function ProfileScreen() {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.7,
+        quality: 0.2,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets[0] && result.assets[0].base64) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setLocalPhotoUri(result.assets[0].uri);
+        const base64Uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        setLocalPhotoUri(base64Uri);
         setIsEditing(true);
       }
     } catch (error) {
