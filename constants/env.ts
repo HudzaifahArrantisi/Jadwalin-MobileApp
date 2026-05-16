@@ -1,14 +1,3 @@
-/**
- * Centralized environment configuration.
- *
- * All EXPO_PUBLIC_* variables are statically replaced at build time by
- * Metro / Expo, so they are safe to reference via `process.env.*`.
- *
- * Usage:
- *   import { Env } from '@/constants/env';
- *   console.log(Env.GOOGLE_WEB_CLIENT_ID);
- */
-
 export const Env = {
   // ─── Firebase ───
   FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',

@@ -509,30 +509,6 @@ subprojects {
   });
 }
 
-// ── 7. Gradle fixes ──
-function withGradleFixes(config) {
-  return withDangerousMod(config, ['android', async (config) => {
-    const androidRoot = config.modRequest.platformProjectRoot;
-    const wrapperPath = path.join(androidRoot, 'gradle', 'wrapper', 'gradle-wrapper.properties');
-    if (fs.existsSync(wrapperPath)) {
-      let w = fs.readFileSync(wrapperPath, 'utf8');
-      w = w.replace(/distributionUrl=.*gradle-[\d.]+-.*\.zip/, 'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.13-bin.zip');
-      fs.writeFileSync(wrapperPath, w, 'utf8');
-    }
-    const propsPath = path.join(androidRoot, 'gradle.properties');
-    if (fs.existsSync(propsPath)) {
-      let p = fs.readFileSync(propsPath, 'utf8');
-      const fixes = { 'org.gradle.parallel': 'false', 'org.gradle.caching': 'false', 'android.minSdkVersion': '24' };
-      for (const [k, v] of Object.entries(fixes)) {
-        const re = new RegExp(`^${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*=.*$`, 'm');
-        p = re.test(p) ? p.replace(re, `${k}=${v}`) : p + `\n${k}=${v}`;
-      }
-      fs.writeFileSync(propsPath, p, 'utf8');
-    }
-    return config;
-  }]);
-}
-
 // ── Main plugin ──
 function withJadwalinWidget(config) {
   config = withWidgetXmlFile(config);
@@ -541,9 +517,7 @@ function withJadwalinWidget(config) {
   config = withWidgetManifest(config);
   config = withMinSdkInAppGradle(config);
   config = withMinSdkInRootGradle(config);
-  config = withGradleFixes(config);
   return config;
 }
 
 module.exports = withJadwalinWidget;
-
