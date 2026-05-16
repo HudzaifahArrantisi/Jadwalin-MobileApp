@@ -1,21 +1,22 @@
-// ============================================
-// Jadwalin App — Forgot Password (BEIGE EDITION v2)
-// Curved wave design with warm tones
-// ============================================
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, TextInput, ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
-  withTiming, FadeInDown, FadeIn,
+  FadeInDown, FadeIn,
 } from 'react-native-reanimated';
 import { resetPassword } from '@/services/auth.service';
-import { Colors, Spacing, FontSize, Radius, sw, Shadow, SCREEN_WIDTH } from '@/constants/theme';
+import { Colors, Spacing, FontSize, sw, Shadow, Radius } from '@/constants/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const PURPLE = '#7C3AED';
+const LIGHT_GREY = '#484848ff';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -24,20 +25,7 @@ export default function ForgotPasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
 
-  // Animations
-  const logoScale = useSharedValue(0.5);
-  const logoOpacity = useSharedValue(0);
   const buttonScale = useSharedValue(1);
-
-  useEffect(() => {
-    logoScale.value = withSpring(1, { damping: 12 });
-    logoOpacity.value = withTiming(1, { duration: 600 });
-  }, []);
-
-  const logoAnim = useAnimatedStyle(() => ({
-    transform: [{ scale: logoScale.value }],
-    opacity: logoOpacity.value,
-  }));
 
   const btnAnim = useAnimatedStyle(() => ({
     transform: [{ scale: buttonScale.value }],
@@ -53,11 +41,7 @@ export default function ForgotPasswordScreen() {
     try {
       await resetPassword(email.trim());
       setIsSent(true);
-      Alert.alert(
-        'Berhasil! ✉️',
-        'Tautan reset password telah dikirim ke email kamu. Silakan cek inbox atau folder spam.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Berhasil! ✉️', 'Tautan reset password telah dikirim.', [{ text: 'OK' }]);
     } catch (error: any) {
       let message = 'Terjadi kesalahan';
       if (error.code === 'auth/invalid-email') message = 'Format email tidak valid';
@@ -70,68 +54,41 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ── Top Wave Section (Beige) ── */}
-          <View style={styles.topWave}>
-            <Animated.View style={[styles.logoContainer, logoAnim]}>
-              <View style={styles.logoCircle}>
-                <Ionicons name="key-outline" size={sw(34)} color={Colors.white} />
-              </View>
-            </Animated.View>
-            <View style={styles.waveCurve} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          
+          <View style={styles.topHeader}>
+            <View style={styles.topHeaderBackground}>
+              <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
+                Forgot
+              </Animated.Text>
+            </View>
+            <View style={styles.topHeaderCurve} />
           </View>
 
-          {/* ── Form Section ── */}
           <View style={styles.formSection}>
-            {/* Back Button */}
             <Animated.View entering={FadeIn.delay(100).duration(300)}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={styles.backButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={sw(22)} color={Colors.brownDark} />
+              <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={sw(22)} color={PURPLE} />
               </TouchableOpacity>
             </Animated.View>
 
-            <Animated.View entering={FadeIn.delay(200).duration(500)}>
-              <Text style={styles.formTitle}>Lupa Password</Text>
-              <Text style={styles.formSubtitle}>
-                Masukkan alamat email yang terdaftar.{'\n'}
-                Kami akan mengirimkan tautan untuk mereset kata sandi kamu.
-              </Text>
-            </Animated.View>
+            <Text style={styles.formSubtitle}>Masukkan email untuk mereset kata sandi.</Text>
 
-            {/* Success State */}
             {isSent && (
               <Animated.View entering={FadeInDown.duration(400)} style={styles.successBanner}>
                 <Ionicons name="checkmark-circle" size={sw(22)} color={Colors.checkGreen} />
-                <Text style={styles.successText}>
-                  Tautan reset telah dikirim! Cek email kamu.
-                </Text>
+                <Text style={styles.successText}>Tautan reset telah dikirim!</Text>
               </Animated.View>
             )}
 
-            {/* Email Input */}
-            <Animated.View
-              entering={FadeInDown.delay(300).duration(400)}
-              style={styles.inputWrapper}
-            >
-              <Text style={styles.inputLabel}>Email</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+            <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.inputWrapper}>
+              <View style={[styles.inputContainer, { borderWidth: 1, borderColor: PURPLE, backgroundColor: Colors.white }]}>
+                <Ionicons name="mail-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="email@contoh.com"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholder="Email or mobile"
+                  placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={(text) => { setEmail(text); setIsSent(false); }}
                   keyboardType="email-address"
@@ -141,45 +98,33 @@ export default function ForgotPasswordScreen() {
               </View>
             </Animated.View>
 
-            {/* Send Link Button */}
-            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: Spacing.lg }}>
+            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: Spacing.xl }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
-                onPressIn={() => { buttonScale.value = withSpring(0.97); }}
-                onPressOut={() => { buttonScale.value = withSpring(1); }}
-                onPress={handleSendReset}
-                disabled={isLoading}
-                activeOpacity={1}
-                style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={Colors.white} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="send" size={sw(18)} color={Colors.white} />
-                    <Text style={styles.primaryButtonText}>Kirim Tautan</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                  onPressIn={() => { buttonScale.value = withSpring(0.97); }}
+                  onPressOut={() => { buttonScale.value = withSpring(1); }}
+                  onPress={handleSendReset}
+                  disabled={isLoading}
+                  activeOpacity={0.9}
+                  style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color={Colors.white} size="small" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Send Link</Text>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </Animated.View>
-          </Animated.View>
-        </View>
 
-          {/* ── Bottom Wave Section ── */}
-          <View style={styles.bottomWave}>
-            <View style={styles.bottomWaveCurve} />
-            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.bottomContent}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={styles.toggleRow}
-              >
-                <Text style={styles.toggleText}>Ingat password? </Text>
-                <Text style={styles.toggleLink}>Sign In</Text>
-              </TouchableOpacity>
-            </Animated.View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <View style={styles.bottomWaveDecor}>
+        <View style={styles.bottomWaveCurve} />
+        <View style={styles.bottomWaveBg} />
+      </View>
     </View>
   );
 }
@@ -187,75 +132,64 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.cream,
+    backgroundColor: Colors.white,
+    position: 'relative',
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: sw(120),
   },
-
-  // ─── Top Wave ───
-  topWave: {
-    backgroundColor: Colors.beige,
-    paddingTop: sw(60),
-    paddingBottom: sw(50),
+  topHeader: {
+    width: '100%',
     alignItems: 'center',
-    position: 'relative',
+    marginBottom: sw(30),
   },
-  logoContainer: {
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  logoCircle: {
-    width: sw(72),
-    height: sw(72),
-    borderRadius: sw(36),
-    backgroundColor: Colors.brownDark,
-    alignItems: 'center',
+  topHeaderBackground: {
+    backgroundColor: PURPLE,
+    width: '100%',
+    height: sw(180),
     justifyContent: 'center',
-    ...Shadow.lg,
+    alignItems: 'center',
+    paddingTop: sw(40),
+    borderBottomLeftRadius: SCREEN_WIDTH * 0.25,
+    borderBottomRightRadius: SCREEN_WIDTH * 0.25,
+    transform: [{ scaleX: 1.2 }],
   },
-  waveCurve: {
+  topHeaderCurve: {
     position: 'absolute',
-    bottom: -sw(30),
-    left: 0,
-    right: 0,
-    height: sw(60),
-    backgroundColor: Colors.beige,
-    borderBottomLeftRadius: SCREEN_WIDTH * 0.5,
-    borderBottomRightRadius: SCREEN_WIDTH * 0.5,
-    zIndex: 1,
+    bottom: -sw(40),
+    width: sw(100),
+    height: sw(100),
+    backgroundColor: Colors.white,
+    borderRadius: sw(50),
   },
-
-  // ─── Form ───
+  headerTitle: {
+    fontSize: sw(42),
+    fontWeight: 'bold',
+    color: Colors.white,
+    transform: [{ scaleX: 0.83 }],
+  },
   formSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: sw(36),
-    flex: 1,
-    zIndex: 0,
+    paddingHorizontal: Spacing.xl,
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
+    marginTop: Spacing.lg,
   },
   backButton: {
-    width: sw(40),
-    height: sw(40),
-    borderRadius: Radius.md,
-    backgroundColor: Colors.white,
+    width: sw(44),
+    height: sw(44),
+    borderRadius: 22,
+    backgroundColor: LIGHT_GREY,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-  },
-  formTitle: {
-    fontSize: sw(28),
-    fontWeight: '800',
-    color: Colors.brownDark,
-    marginBottom: sw(6),
-    letterSpacing: -0.5,
+    marginBottom: Spacing.lg,
   },
   formSubtitle: {
     fontSize: FontSize.md,
     color: Colors.textSecondary,
     marginBottom: Spacing.xl,
-    lineHeight: sw(22),
+    textAlign: 'center',
   },
   successBanner: {
     flexDirection: 'row',
@@ -273,28 +207,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputWrapper: {
-    marginBottom: Spacing.md,
-  },
-  inputLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: Spacing.lg,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    height: sw(52),
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.lg,
+    height: sw(56),
+    backgroundColor: LIGHT_GREY,
   },
   inputIcon: {
-    marginRight: Spacing.sm,
+    marginRight: Spacing.md,
   },
   input: {
     flex: 1,
@@ -303,58 +227,40 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   primaryButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    height: sw(52),
-    backgroundColor: Colors.brownDark,
-    borderRadius: Radius.xl,
+    height: sw(56),
+    backgroundColor: PURPLE,
+    borderRadius: 999,
     ...Shadow.md,
   },
   primaryButtonText: {
     color: Colors.white,
     fontSize: FontSize.lg,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: 'bold',
   },
-
-  // ─── Bottom Wave ───
-  bottomWave: {
-    flex: 1,
+  bottomWaveDecor: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    height: sw(100),
     justifyContent: 'flex-end',
-    minHeight: sw(120),
-    backgroundColor: Colors.beige,
-    marginTop: sw(30),
-    position: 'relative',
+  },
+  bottomWaveBg: {
+    backgroundColor: PURPLE,
+    height: sw(80),
+    borderTopLeftRadius: SCREEN_WIDTH * 0.25,
+    borderTopRightRadius: SCREEN_WIDTH * 0.25,
+    transform: [{ scaleX: 1.2 }],
   },
   bottomWaveCurve: {
     position: 'absolute',
-    top: -sw(30),
-    left: 0,
-    right: 0,
-    height: sw(60),
-    backgroundColor: Colors.beige,
-    borderTopLeftRadius: SCREEN_WIDTH * 0.5,
-    borderTopRightRadius: SCREEN_WIDTH * 0.5,
-  },
-  bottomContent: {
-    paddingBottom: sw(40),
-    alignItems: 'center',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  toggleText: {
-    fontSize: FontSize.md,
-    color: Colors.brown,
-  },
-  toggleLink: {
-    fontSize: FontSize.md,
-    fontWeight: '700',
-    color: Colors.brownDark,
-    textDecorationLine: 'underline',
+    bottom: sw(40),
+    alignSelf: 'center',
+    width: sw(120),
+    height: sw(120),
+    backgroundColor: Colors.white,
+    borderRadius: sw(60),
+    zIndex: 1,
   },
 });

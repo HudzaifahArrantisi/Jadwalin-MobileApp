@@ -22,16 +22,18 @@ import {
 import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { Env } from '@/constants/env';
+
 // ──── Firebase Config ────
 // Replace the placeholder values with your own Firebase project config
 const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
+  apiKey: Env.FIREBASE_API_KEY,
+  authDomain: Env.FIREBASE_AUTH_DOMAIN,
+  projectId: Env.FIREBASE_PROJECT_ID,
+  storageBucket: Env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: Env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: Env.FIREBASE_APP_ID,
+  measurementId: Env.FIREBASE_MEASUREMENT_ID
 };
 
 // ──── Initialize Firebase ────

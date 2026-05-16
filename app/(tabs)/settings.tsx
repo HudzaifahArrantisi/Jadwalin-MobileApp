@@ -56,10 +56,15 @@ export default function ProfileScreen() {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         if (auth.currentUser) {
-          await updateProfile(auth.currentUser, {
-            displayName: name.trim(),
-            photoURL: localPhotoUri || user.photoURL,
-          });
+          const profileUpdates: any = { displayName: name.trim() };
+          const photoToSave = localPhotoUri || user.photoURL;
+          
+          // Firebase Auth photoURL has length limits. Do not send base64 strings to updateProfile.
+          if (photoToSave && !photoToSave.startsWith('data:image')) {
+            profileUpdates.photoURL = photoToSave;
+          }
+
+          await updateProfile(auth.currentUser, profileUpdates);
         }
         
         await setDoc(doc(db, 'users', user.uid), {
@@ -318,7 +323,7 @@ const styles = StyleSheet.create({
   fieldGroup: { marginBottom: Spacing.lg },
   fieldLabel: { fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
   input: {
-    backgroundColor: Colors.cream, borderRadius: Radius.md, paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.inputBg, borderRadius: Radius.md, paddingHorizontal: Spacing.md,
     paddingVertical: sw(14), fontSize: FontSize.md, color: Colors.textPrimary,
   },
   textArea: { minHeight: sw(80), paddingTop: Spacing.md },

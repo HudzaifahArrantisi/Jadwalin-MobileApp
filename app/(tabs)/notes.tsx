@@ -158,7 +158,7 @@ const detailStyles = StyleSheet.create({
   itemTextCompleted: { textDecorationLine: 'line-through', color: Colors.textMuted, opacity: 0.6 },
   inputRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)',
+    paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.borderLight,
   },
   input: {
     flex: 1, backgroundColor: Colors.white, borderRadius: Radius.md,

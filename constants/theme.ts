@@ -1,6 +1,6 @@
 // ============================================
-// Jadwalin App — BEIGE/CREAM EDITION Theme
-// Matching UI/UX reference images
+// Jadwalin App — DARK PREMIUM EDITION Theme
+// Matching Dark Mode UI/UX reference images
 // ============================================
 
 import { Dimensions, PixelRatio } from 'react-native';
@@ -28,65 +28,102 @@ export const normalize = (size: number) => {
   return Math.round(PixelRatio.roundToNearestPixel(newSize));
 };
 
-// ─── Color Palette (Beige/Cream Edition from UI reference) ───
+// ─── Color Palette (Purple/White/Black/Grey Theme) ───
 
 export const Colors = {
   // Primary backgrounds
-  cream: '#FFFDF9',          // Cloud Cream (Main page background)
-  beige: '#F8F3ED',          // Soft Sand (Header background)
-  beigeDark: '#E8D9C5',      // Almond (Tab bar pill)
-  brown: '#9C8B75',          // Driftwood (Brown text/accents)
-  brownDark: '#6B5D4F',      // Espresso Muted (Important text/buttons)
-  brownLight: '#D4C4AD',     // Sand Dollar (Light brown cards)
+  cream: '#FFFFFF',            // Main page background
+  beige: '#F3F4F6',            // Header background / Light grey
+  beigeDark: '#E5E7EB',        // Elevated Surface
+  brown: '#6B7280',            // Muted Gray (Secondary text)
+  brownDark: '#7C3AED',        // Vivid Purple (Primary accent)
+  brownLight: '#F9FAFB',       // Card Surface
 
-  // Activity card section (daily tasks - stone area)
-  dailyCardBg: '#C4B8A4',    // Warm Stone background
-  dailyCardBorder: '#B5A894',
+  // Activity card section
+  dailyCardBg: '#FFFFFF',
+  dailyCardBorder: '#E5E7EB',
+
+  // Colorful task card palette
+  taskPurple: '#A855F7',
+  taskBlue: '#38BDF8',
+  taskGreen: '#22C55E',
+  taskRed: '#EF4444',
+  taskPink: '#EC4899',
+  taskOrange: '#F97316',
+  taskTeal: '#14B8A6',
+  taskYellow: '#EAB308',
 
   // Pastel colors for lists/notes
-  pastelGreen: '#E2EDDA',    // Sage Mist
-  pastelGreenDark: '#C8D9BC', // Sage
-  pastelRose: '#FDF0ED',     // Dusty Rose (BARU)
-  pastelBlue: '#E4ECF3',     // Mist Blue (BARU)
+  pastelGreen: '#D1FAE5',
+  pastelGreenDark: '#A7F3D0',
+  pastelRose: '#FCE7F3',
+  pastelBlue: '#DBEAFE',
 
-  // Status colors (Desaturated/Pastel)
-  checkGreen: '#7FB685',     // Soft Fern
-  success: '#7FB685',
-  warning: '#D4A96A',
-  danger: '#D4816B',         // Terracotta (Soft danger)
-  info: '#9AB3D4',
+  // Status colors
+  checkGreen: '#10B981',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6',
 
   // Basic colors
   white: '#FFFFFF',
-  black: '#2D2B28',          // Charcoal Warm
-  textPrimary: '#2D2B28',
-  textSecondary: '#7A7570',  // Pebble
-  textMuted: '#A8A29E',      // Stone
+  black: '#000000',
+  textPrimary: '#1F2937',      // Near Black
+  textSecondary: '#6B7280',    // Muted Gray
+  textMuted: '#9CA3AF',        // Dim Gray
   textLight: '#FFFFFF',
 
   // Inputs & borders
-  inputBg: '#FFFFFF',
-  inputBorder: '#EFE9E1',    // Linen
-  borderLight: '#EDE8E1',
+  inputBg: '#F3F4F6',
+  inputBorder: '#E5E7EB',
+  borderLight: '#E5E7EB',
 
   // Tab bar
-  tabBarBg: '#FFFDF9',
-  tabBarActive: '#6B5D4F',
-  tabBarInactive: '#A8A29E',
+  tabBarBg: '#FFFFFF',
+  tabBarActive: '#7C3AED',
+  tabBarInactive: '#9CA3AF',
 
   // Calendar
-  calendarHeader: '#F8F3ED',
-  calendarSelected: '#6B5D4F',
-  calendarToday: '#D4C4AD',
-  calendarDot: '#7FB685',
+  calendarHeader: '#FFFFFF',
+  calendarSelected: '#7C3AED',
+  calendarToday: '#F3F4F6',
+  calendarDot: '#7C3AED',
+  calendarPastDay: '#7C3AED',
 
   // Overlay
-  overlay: 'rgba(45, 43, 40, 0.4)',
+  overlay: 'rgba(0, 0, 0, 0.4)',
 
   // Profile section
-  profileBg: '#F5EDE3',
-  profileFormBg: '#E8D9C5',
+  profileBg: '#F3F4F6',
+  profileFormBg: '#FFFFFF',
 } as const;
+
+// ─── Task Card Color Palette ───
+// Rotating colors assigned to tasks for visual variety
+export const TASK_CARD_COLORS = [
+  '#A855F7',  // Purple
+  '#38BDF8',  // Blue
+  '#22C55E',  // Green
+  '#EF4444',  // Red
+  '#EC4899',  // Pink
+  '#F97316',  // Orange
+  '#14B8A6',  // Teal
+  '#EAB308',  // Yellow
+] as const;
+
+/** Get a task card color based on index or string hash */
+export function getTaskCardColor(indexOrTitle: number | string): string {
+  if (typeof indexOrTitle === 'number') {
+    return TASK_CARD_COLORS[indexOrTitle % TASK_CARD_COLORS.length];
+  }
+  // Simple string hash for consistent color per task title
+  let hash = 0;
+  for (let i = 0; i < indexOrTitle.length; i++) {
+    hash = indexOrTitle.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return TASK_CARD_COLORS[Math.abs(hash) % TASK_CARD_COLORS.length];
+}
 
 // ─── Spacing System (responsive) ───
 
@@ -137,29 +174,36 @@ export const FontWeight = {
   extrabold: '800' as const,
 };
 
-// ─── Shadows ───
+// ─── Shadows (subtle for dark mode) ───
 
 export const Shadow = {
   sm: {
-    shadowColor: '#6B5D4F',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#6B5D4F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
     elevation: 2,
   },
+  md: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   lg: {
-    shadowColor: '#2D2B28',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.4,
     shadowRadius: 12,
-    elevation: 3,
+    elevation: 6,
+  },
+  glow: {
+    shadowColor: '#7C5CFC',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 4,
   },
 } as const;
 

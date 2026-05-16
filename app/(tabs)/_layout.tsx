@@ -70,7 +70,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             }
           }}
         >
-          <Ionicons name="person-circle-outline" size={sw(36)} color={Colors.black} />
+          <Ionicons name="person-circle-outline" size={sw(36)} color={Colors.white} />
         </TouchableOpacity>
       )}
     </View>

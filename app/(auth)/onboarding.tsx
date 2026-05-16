@@ -28,28 +28,33 @@ interface OnboardingSlide {
   subtitle: string;
 }
 
+const PURPLE = '#7C3AED';
+const LIGHT_PURPLE = '#8B5CF6';
+const DARK_PURPLE = '#6D28D9';
+const WHITE = '#FFFFFF';
+
 const SLIDES: OnboardingSlide[] = [
   {
     id: '1',
     icon: 'calendar',
-    bgColor: Colors.dailyCardBg,
-    accentColor: Colors.brownDark,
+    bgColor: '#EEDEFF', // Light pastel purple
+    accentColor: PURPLE,
     title: 'Atur Jadwalmu\nDengan Mudah',
     subtitle: 'Tambah jadwal, tugas, dan pertemuan hanya dengan beberapa ketukan. Pilih tanggal, atur waktu, selesai!',
   },
   {
     id: '2',
     icon: 'notifications',
-    bgColor: Colors.pastelGreen,
-    accentColor: '#5B7F4A',
+    bgColor: '#F3E8FF',
+    accentColor: LIGHT_PURPLE,
     title: 'Tidak Ada\nYang Terlewat',
     subtitle: 'Jadwalin mengingatkanmu secara otomatis sebelum deadline tiba. Kamu akan selalu siap.',
   },
   {
     id: '3',
     icon: 'rocket',
-    bgColor: Colors.beige,
-    accentColor: Colors.brownDark,
+    bgColor: '#F5F3FF',
+    accentColor: DARK_PURPLE,
     title: 'Produktif\nSetiap Hari',
     subtitle: 'Dashboard intuitif, kalender visual, dan catatan pribadi membantumu tetap terorganisir dan fokus.',
   },

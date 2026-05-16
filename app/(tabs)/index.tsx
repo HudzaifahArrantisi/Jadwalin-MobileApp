@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
 import { Task } from '@/types/task.types';
 import { parseTaskDate } from '@/utils/date';
-import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH } from '@/constants/theme';
+import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH, getTaskCardColor, TASK_CARD_COLORS } from '@/constants/theme';
 import InteractivePressable from '@/components/InteractivePressable';
 
 const formatLocalDate = (d: Date) => {
@@ -118,7 +118,7 @@ function CalendarDayItem({
       <View style={styles.dayIndicators}>
         {taskIndicators.length > 0 ? (
           taskIndicators.slice(0, 3).map((ind, idx) => {
-             const dotColors = ['#a28896', '#8797c2', '#86b88b'];
+             const dotColors = ['#A855F7', '#38BDF8', '#22C55E'];
              const defaultColor = dotColors[idx % dotColors.length];
              
              return (
@@ -139,13 +139,14 @@ function CalendarDayItem({
   );
 }
 
-// ─── Daily Task Card (Brown section) ───
+// ─── Daily Task Card (Colorful cards like reference) ───
 function DailyTaskItem({ task, index }: { task: Task, index: number }) {
   const timeStr = task.scheduledStart && task.scheduledEnd
-    ? `(${task.scheduledStart} - ${task.scheduledEnd})`
+    ? `${task.scheduledStart} - ${task.scheduledEnd}`
     : task.deadlineTime
-    ? `( ${task.deadlineTime} )`
+    ? task.deadlineTime
     : '';
+  const cardColor = getTaskCardColor(task.title || index);
 
   return (
     <Animated.View 
@@ -153,18 +154,23 @@ function DailyTaskItem({ task, index }: { task: Task, index: number }) {
       layout={Layout.springify()}
       style={styles.dailyRow}
     >
-      <View style={styles.dailyDot} />
-      <View style={styles.dailyItem}>
-        <Text style={styles.dailyTitle} numberOfLines={1}>
-          {task.title}
-        </Text>
-        {timeStr ? (
-          <Text style={styles.dailyTime}>{timeStr}</Text>
-        ) : null}
-        <View style={{flex: 1}} />
+      <View style={[styles.dailyItem, { backgroundColor: cardColor }]}>
         {task.icon ? (
-          <Ionicons name={task.icon as any} size={sw(20)} color={Colors.black} />
+          <View style={styles.dailyIconWrap}>
+            <Ionicons name={task.icon as any} size={sw(18)} color={Colors.white} />
+          </View>
         ) : null}
+        <View style={styles.dailyTextWrap}>
+          <Text style={styles.dailyTitle} numberOfLines={1}>
+            {task.title}
+          </Text>
+          {timeStr ? (
+            <Text style={styles.dailyTime}>{timeStr}</Text>
+          ) : null}
+        </View>
+        <InteractivePressable style={styles.dailyCheckBtn}>
+          <Ionicons name="checkmark" size={sw(16)} color={cardColor} />
+        </InteractivePressable>
       </View>
     </Animated.View>
   );
@@ -248,10 +254,20 @@ function MiniCalendarDropdown({
   }, [month, year]);
 
   const taskMap = useMemo(() => {
-    const m: Record<string, boolean> = {};
+    const m: Record<string, string[]> = {};
     tasks.forEach((t) => {
       const d = parseTaskDate(t.date);
-      if (d) m[formatLocalDate(d)] = true;
+      if (d) {
+        const dateStr = formatLocalDate(d);
+        if (!m[dateStr]) m[dateStr] = [];
+        // Show up to 3 different task colors as dots
+        if (m[dateStr].length < 3) {
+          const color = getTaskCardColor(t.id || t.title);
+          if (!m[dateStr].includes(color)) {
+            m[dateStr].push(color);
+          }
+        }
+      }
     });
     return m;
   }, [tasks]);
@@ -292,7 +308,7 @@ function MiniCalendarDropdown({
             {calDays.map((day, idx) => {
               const isSelected = day.dateStr === selectedDate;
               const isToday = day.dateStr === todayStr;
-              const hasTask = taskMap[day.dateStr];
+              const dayTasks = taskMap[day.dateStr];
 
               return (
                 <InteractivePressable
@@ -309,8 +325,18 @@ function MiniCalendarDropdown({
                     isSelected && { color: Colors.white, fontWeight: '700' },
                     isToday && !isSelected && { color: Colors.brownDark, fontWeight: '800' },
                   ]}>{day.date}</Text>
-                  {hasTask && (
-                    <View style={[miniStyles.dot, isSelected && { backgroundColor: Colors.white }]} />
+                  {dayTasks && dayTasks.length > 0 && (
+                    <View style={miniStyles.dotRow}>
+                      {dayTasks.map((color, i) => (
+                        <View 
+                          key={i} 
+                          style={[
+                            miniStyles.dot, 
+                            { backgroundColor: isSelected ? Colors.white : color }
+                          ]} 
+                        />
+                      ))}
+                    </View>
                   )}
                 </InteractivePressable>
               );
@@ -324,16 +350,17 @@ function MiniCalendarDropdown({
 
 const miniStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center' },
-  container: { backgroundColor: Colors.cream, borderRadius: Radius.xl, padding: Spacing.lg, width: SCREEN_WIDTH - sw(48), ...Shadow.lg },
+  container: { backgroundColor: Colors.beige, borderRadius: Radius.xl, padding: Spacing.lg, width: SCREEN_WIDTH - sw(48), ...Shadow.lg },
   monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
-  monthText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.brownDark },
+  monthText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
   dayHeaderRow: { flexDirection: 'row', marginBottom: Spacing.xs },
   dayHeader: { textAlign: 'center', fontSize: FontSize.xxs, fontWeight: '600', color: Colors.textMuted },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { alignItems: 'center', paddingVertical: sw(5), borderRadius: Radius.sm },
   cellSelected: { backgroundColor: Colors.brownDark },
   cellText: { fontSize: FontSize.sm, color: Colors.textPrimary },
-  dot: { width: sw(4), height: sw(4), borderRadius: sw(2), backgroundColor: Colors.calendarDot, marginTop: sw(1) },
+  dotRow: { flexDirection: 'row', gap: sw(2), marginTop: sw(1), justifyContent: 'center' },
+  dot: { width: sw(4), height: sw(4), borderRadius: sw(2), backgroundColor: Colors.calendarDot },
 });
 
 // ─── Main Home Screen ───
@@ -348,7 +375,7 @@ export default function HomeScreen() {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(formatLocalDate(today));
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
-  const [isWeeklyListVisible, setIsWeeklyListVisible] = useState(false);
+  const [isWeeklyListVisible, setIsWeeklyListVisible] = useState(true);
 
   const weeks = useMemo(() => generateWeeks(today, 8, 8), []);
   const initialWeekIndex = 8; // center week
@@ -441,7 +468,6 @@ export default function HomeScreen() {
           <Text style={styles.dateTitle}>
             {displayedDate.dayMonth} <Text style={styles.dateYear}>{displayedDate.year}</Text>
           </Text>
-          <Ionicons name="chevron-down" size={sw(20)} color={Colors.black} />
         </InteractivePressable>
         <InteractivePressable
           onPress={() => router.push('/(tabs)/settings')}
@@ -491,14 +517,9 @@ export default function HomeScreen() {
 
         {/* ── Daily Activities Section (Brown Card) ── */}
         <Animated.View entering={FadeInDown.delay(200).duration(600).springify()} style={styles.dailySection}>
-          <InteractivePressable
-            style={styles.dailyHeader}
-            onPress={() => setShowMiniCalendar(true)}
-            hapticType={Haptics.ImpactFeedbackStyle.Medium}
-          >
+          <View style={styles.dailyHeader}>
             <Text style={styles.dailyHeaderText}>{selectedDayLabel}</Text>
-            <Ionicons name="chevron-down" size={sw(16)} color={Colors.white} />
-          </InteractivePressable>
+          </View>
 
           {selectedDayTasks.length > 0 ? (
             <View style={styles.dailyList}>
@@ -521,11 +542,6 @@ export default function HomeScreen() {
             hapticType={Haptics.ImpactFeedbackStyle.Light}
           >
             <Text style={styles.weeklyHeaderText}>List kegiatan dalam 1 minggu</Text>
-            <Ionicons 
-              name={isWeeklyListVisible ? "chevron-up" : "chevron-down"} 
-              size={sw(20)} 
-              color={Colors.black} 
-            />
           </InteractivePressable>
 
           {isWeeklyListVisible && (
@@ -563,7 +579,7 @@ export default function HomeScreen() {
   );
 }
 
-// ─── Styles ───
+// ─── Styles (Dark Premium) ───
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -592,11 +608,11 @@ const styles = StyleSheet.create({
   dateTitle: {
     fontSize: FontSize.hero,
     fontWeight: '700',
-    color: Colors.brownDark,
+    color: Colors.textPrimary,
     letterSpacing: -0.5,
   },
   dateYear: {
-    color: Colors.brown,
+    color: Colors.textSecondary,
     fontWeight: '500',
   },
   avatar: {
@@ -604,7 +620,7 @@ const styles = StyleSheet.create({
     height: sw(46),
     borderRadius: sw(23),
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: Colors.brownDark,
   },
   avatarPlaceholder: {
     width: sw(46),
@@ -614,7 +630,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: '#5A4AD4',
   },
 
   // Week Calendar
@@ -632,11 +648,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: (SCREEN_WIDTH - sw(48)) / 7,
     paddingVertical: sw(10),
-    borderRadius: Radius.lg,
+    borderRadius: Radius.full,
   },
   dayItemSelected: {
     backgroundColor: Colors.brownDark,
-    ...Shadow.md,
+    ...Shadow.glow,
   },
   dayName: {
     fontSize: FontSize.xxs,
@@ -676,7 +692,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.checkGreen,
   },
 
-  // Daily Section (Brown/Stone)
+  // Daily Section
   dailySection: {
     backgroundColor: Colors.dailyCardBg,
     borderRadius: Radius.xxl,
@@ -695,7 +711,7 @@ const styles = StyleSheet.create({
   dailyHeaderText: {
     fontSize: FontSize.lg,
     fontWeight: '700',
-    color: Colors.white,
+    color: Colors.textPrimary,
   },
   dailyList: {
     gap: Spacing.sm,
@@ -704,33 +720,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  dailyDot: {
-    width: sw(10),
-    height: sw(10),
-    borderRadius: sw(5),
-    backgroundColor: Colors.brownLight,
-    marginRight: Spacing.sm,
-  },
   dailyItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
     borderRadius: Radius.xl,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     paddingVertical: sw(14),
-    ...Shadow.sm,
+  },
+  dailyIconWrap: {
+    width: sw(32),
+    height: sw(32),
+    borderRadius: sw(10),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  dailyTextWrap: {
+    flex: 1,
   },
   dailyTitle: {
     fontSize: FontSize.md,
     fontWeight: '700',
-    color: Colors.textPrimary,
-    marginRight: sw(8),
+    color: Colors.white,
   },
   dailyTime: {
     fontSize: FontSize.xs,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.75)',
     fontWeight: '500',
+    marginTop: sw(2),
+  },
+  dailyCheckBtn: {
+    width: sw(32),
+    height: sw(32),
+    borderRadius: sw(16),
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.sm,
   },
   emptyDaily: {
     paddingVertical: Spacing.lg,
@@ -738,7 +766,7 @@ const styles = StyleSheet.create({
   },
   emptyDailyText: {
     fontSize: FontSize.md,
-    color: Colors.white,
+    color: Colors.textMuted,
     opacity: 0.8,
     fontWeight: '500',
   },
@@ -764,11 +792,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Radius.xl,
-    backgroundColor: Colors.pastelGreen,
+    backgroundColor: Colors.beige,
     paddingHorizontal: Spacing.md,
     paddingVertical: sw(16),
     marginBottom: Spacing.sm,
-    ...Shadow.sm,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
   },
   weeklyDate: {
     fontSize: FontSize.md,

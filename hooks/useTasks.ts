@@ -16,6 +16,7 @@ import {
   cancelTaskReminders,
   rescheduleTaskReminders,
 } from '@/services/notification.service';
+import { syncWidgetData } from '@/services/widget.service';
 import {
   Task,
   CreateTaskInput,
@@ -36,7 +37,7 @@ export function useTasks() {
     setError,
   } = useTaskStore();
 
-  // Subscribe to realtime updates
+  // Subscribe to realtime updates + auto-sync widget
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -44,6 +45,8 @@ export function useTasks() {
     const unsubscribe = subscribeToTasks(user.uid, (updatedTasks) => {
       setTasks(updatedTasks);
       setLoading(false);
+      // Auto-sync widget data whenever tasks change
+      syncWidgetData(updatedTasks).catch(() => {});
     });
 
     return unsubscribe;

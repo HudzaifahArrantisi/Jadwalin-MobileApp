@@ -23,20 +23,14 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
-
-// ── Jadwalin: Force minSdkVersion 24 on ALL subprojects (libraries + CMake) ──
+// ── Jadwalin: Force minSdkVersion 24 ──
 subprojects {
     plugins.withType(com.android.build.gradle.LibraryPlugin) {
         android {
             if (defaultConfig.minSdkVersion == null || defaultConfig.minSdkVersion.apiLevel < 24) {
                 defaultConfig.minSdkVersion 24
             }
-            // Force CMake-level minimum API to 24
-            defaultConfig.externalNativeBuild {
-                cmake {
-                    arguments "-DANDROID_PLATFORM=android-24"
-                }
-            }
+            defaultConfig.externalNativeBuild { cmake { arguments "-DANDROID_PLATFORM=android-24" } }
         }
     }
     plugins.withType(com.android.build.gradle.AppPlugin) {

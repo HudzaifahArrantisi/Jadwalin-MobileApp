@@ -28,6 +28,7 @@ module.exports = {
   },
   plugins: [
     "expo-router",
+    "expo-web-browser",
     [
       "expo-splash-screen",
       {
@@ -53,7 +54,7 @@ module.exports = {
         },
       },
     ],
-    "@react-native-google-signin/google-signin",
+    // "@react-native-google-signin/google-signin" — replaced by expo-auth-session
     "./plugins/withJadwalinWidget",
   ],
   experiments: {

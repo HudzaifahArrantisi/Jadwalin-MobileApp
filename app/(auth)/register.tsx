@@ -1,21 +1,22 @@
-// ============================================
-// Jadwalin App — Register Screen (BEIGE EDITION v2)
-// Curved wave design with warm tones
-// ============================================
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, TextInput, ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
-  withTiming, FadeInDown, FadeIn,
+  FadeInDown, FadeIn,
 } from 'react-native-reanimated';
 import { registerWithEmail } from '@/services/auth.service';
-import { Colors, Spacing, FontSize, Radius, sw, Shadow, SCREEN_WIDTH } from '@/constants/theme';
+import { Colors, Spacing, FontSize, sw, Shadow } from '@/constants/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const PURPLE = '#7C3AED';
+const LIGHT_GREY = '#F3F4F6';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -23,45 +24,22 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
-  // Animations
-  const logoScale = useSharedValue(0.5);
-  const logoOpacity = useSharedValue(0);
   const buttonScale = useSharedValue(1);
-
-  useEffect(() => {
-    logoScale.value = withSpring(1, { damping: 12 });
-    logoOpacity.value = withTiming(1, { duration: 600 });
-  }, []);
-
-  const logoAnim = useAnimatedStyle(() => ({
-    transform: [{ scale: logoScale.value }],
-    opacity: logoOpacity.value,
-  }));
 
   const btnAnim = useAnimatedStyle(() => ({
     transform: [{ scale: buttonScale.value }],
   }));
 
   const handleRegister = async () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Nama lengkap wajib diisi');
-      return;
-    }
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Email dan password wajib diisi');
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Semua field wajib diisi');
       return;
     }
     if (password.length < 6) {
       Alert.alert('Error', 'Password minimal 6 karakter');
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Konfirmasi password tidak cocok');
       return;
     }
 
@@ -82,59 +60,26 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ── Top Wave Section (Beige) ── */}
-          <View style={styles.topWave}>
-            <Animated.View style={[styles.logoContainer, logoAnim]}>
-              <View style={styles.logoCircle}>
-                <Ionicons name="calendar" size={sw(32)} color={Colors.white} />
-              </View>
-            </Animated.View>
-            <View style={styles.waveCurve} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          
+          <View style={styles.topHeader}>
+            <View style={styles.topHeaderBackground}>
+              <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
+                Sign Up
+              </Animated.Text>
+            </View>
+            <View style={styles.topHeaderCurve} />
           </View>
 
-          {/* ── Form Section ── */}
           <View style={styles.formSection}>
-            <Animated.View entering={FadeIn.delay(200).duration(500)}>
-              <Text style={styles.formTitle}>Buat Akun</Text>
-              <Text style={styles.formSubtitle}>
-                Daftarkan dirimu untuk mulai{'\n'}mengelola jadwalmu
-              </Text>
-            </Animated.View>
-
-            {/* Full Name */}
             <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Nama Lengkap</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+              <View style={[styles.inputContainer, { borderWidth: 1, borderColor: PURPLE, backgroundColor: Colors.white }]}>
+                <Ionicons name="mail-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Masukkan nama lengkap"
-                  placeholderTextColor={Colors.textMuted}
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                />
-              </View>
-            </Animated.View>
-
-            {/* Email */}
-            <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="email@contoh.com"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholder="Email or mobile"
+                  placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -144,94 +89,75 @@ export default function RegisterScreen() {
               </View>
             </Animated.View>
 
-            {/* Password */}
-            <Animated.View entering={FadeInDown.delay(450).duration(400)} style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Password</Text>
+            <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+                <Ionicons name="person-outline" size={sw(18)} color="#6B7280" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Minimal 6 karakter"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholder="User name"
+                  placeholderTextColor="#9CA3AF"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                />
+              </View>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(450).duration(400)} style={styles.inputWrapper}>
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={sw(18)} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#9CA3AF"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={sw(20)}
-                    color={Colors.brown}
-                  />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={sw(20)} color="#6B7280" />
                 </TouchableOpacity>
               </View>
             </Animated.View>
 
-            {/* Confirm Password */}
-            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Konfirmasi Password</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="shield-checkmark-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ulangi password"
-                  placeholderTextColor={Colors.textMuted}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showConfirm}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirm(!showConfirm)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
-                    size={sw(20)}
-                    color={Colors.brown}
-                  />
-                </TouchableOpacity>
-              </View>
+            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.rememberForgotRow}>
+              <Text style={styles.rememberText}>Remember me</Text>
             </Animated.View>
 
-            {/* Create Account Button */}
-            <Animated.View entering={FadeInDown.delay(550).duration(400)} style={{ marginTop: Spacing.md }}>
+            <Animated.View entering={FadeInDown.delay(550).duration(400)} style={{ marginTop: Spacing.xl }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
-                onPressIn={() => { buttonScale.value = withSpring(0.97); }}
-                onPressOut={() => { buttonScale.value = withSpring(1); }}
-                onPress={handleRegister}
-                disabled={isLoading}
-                activeOpacity={1}
-                style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={Colors.white} size="small" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>Buat Akun</Text>
-                )}
-              </TouchableOpacity>
+                  onPressIn={() => { buttonScale.value = withSpring(0.97); }}
+                  onPressOut={() => { buttonScale.value = withSpring(1); }}
+                  onPress={handleRegister}
+                  disabled={isLoading}
+                  activeOpacity={0.9}
+                  style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color={Colors.white} size="small" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>SignUp</Text>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </Animated.View>
-          </Animated.View>
-        </View>
 
-          {/* ── Bottom Wave Section ── */}
-          <View style={styles.bottomWave}>
-            <View style={styles.bottomWaveCurve} />
-            <Animated.View entering={FadeInDown.delay(650).duration(400)} style={styles.bottomContent}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={styles.toggleRow}
-              >
-                <Text style={styles.toggleText}>Sudah punya akun? </Text>
-                <Text style={styles.toggleLink}>Sign In</Text>
+            <Animated.View entering={FadeInDown.delay(650).duration(400)} style={styles.footerRow}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.toggleRow}>
+                <Text style={styles.toggleText}>Already have an account? </Text>
+                <Text style={styles.toggleLink}>Log IN</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <View style={styles.bottomWaveDecor}>
+        <View style={styles.bottomWaveCurve} />
+        <View style={styles.bottomWaveBg} />
+      </View>
     </View>
   );
 }
@@ -239,87 +165,63 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.cream,
+    backgroundColor: Colors.white,
+    position: 'relative',
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: sw(120), // Leave room for bottom wave
   },
-
-  // ─── Top Wave ───
-  topWave: {
-    backgroundColor: Colors.beige,
-    paddingTop: sw(50),
-    paddingBottom: sw(40),
+  topHeader: {
+    width: '100%',
     alignItems: 'center',
-    position: 'relative',
+    marginBottom: sw(30),
   },
-  logoContainer: {
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  logoCircle: {
-    width: sw(64),
-    height: sw(64),
-    borderRadius: sw(32),
-    backgroundColor: Colors.brownDark,
-    alignItems: 'center',
+  topHeaderBackground: {
+    backgroundColor: PURPLE,
+    width: '100%',
+    height: sw(180),
     justifyContent: 'center',
-    ...Shadow.lg,
+    alignItems: 'center',
+    paddingTop: sw(40),
+    borderBottomLeftRadius: SCREEN_WIDTH * 0.25,
+    borderBottomRightRadius: SCREEN_WIDTH * 0.25,
+    transform: [{ scaleX: 1.2 }],
   },
-  waveCurve: {
+  topHeaderCurve: {
     position: 'absolute',
-    bottom: -sw(30),
-    left: 0,
-    right: 0,
-    height: sw(60),
-    backgroundColor: Colors.beige,
-    borderBottomLeftRadius: SCREEN_WIDTH * 0.5,
-    borderBottomRightRadius: SCREEN_WIDTH * 0.5,
-    zIndex: 1,
+    bottom: -sw(40),
+    width: sw(100),
+    height: sw(100),
+    backgroundColor: Colors.white,
+    borderRadius: sw(50),
   },
-
-  // ─── Form ───
+  headerTitle: {
+    fontSize: sw(42),
+    fontWeight: 'bold',
+    color: Colors.white,
+    transform: [{ scaleX: 0.83 }], // counteract scaleX of parent
+  },
   formSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: sw(36),
-    zIndex: 0,
-  },
-  formTitle: {
-    fontSize: sw(28),
-    fontWeight: '800',
-    color: Colors.brownDark,
-    marginBottom: sw(6),
-    letterSpacing: -0.5,
-  },
-  formSubtitle: {
-    fontSize: FontSize.md,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.lg,
-    lineHeight: sw(22),
+    paddingHorizontal: Spacing.xl,
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
+    marginTop: Spacing.xl,
   },
   inputWrapper: {
-    marginBottom: Spacing.md,
-  },
-  inputLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: Spacing.lg,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    height: sw(52),
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.lg,
+    height: sw(56),
+    backgroundColor: LIGHT_GREY,
   },
   inputIcon: {
-    marginRight: Spacing.sm,
+    marginRight: Spacing.md,
   },
   input: {
     flex: 1,
@@ -327,57 +229,66 @@ const styles = StyleSheet.create({
     height: '100%',
     color: Colors.textPrimary,
   },
+  rememberForgotRow: {
+    alignItems: 'center',
+    marginTop: -Spacing.xs,
+  },
+  rememberText: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: 'bold',
+  },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: sw(52),
-    backgroundColor: Colors.brownDark,
-    borderRadius: Radius.xl,
+    height: sw(56),
+    backgroundColor: PURPLE,
+    borderRadius: 999,
     ...Shadow.md,
   },
   primaryButtonText: {
     color: Colors.white,
     fontSize: FontSize.lg,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: 'bold',
   },
-
-  // ─── Bottom Wave ───
-  bottomWave: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    minHeight: sw(100),
-    backgroundColor: Colors.beige,
+  footerRow: {
     marginTop: sw(30),
-    position: 'relative',
-  },
-  bottomWaveCurve: {
-    position: 'absolute',
-    top: -sw(30),
-    left: 0,
-    right: 0,
-    height: sw(60),
-    backgroundColor: Colors.beige,
-    borderTopLeftRadius: SCREEN_WIDTH * 0.5,
-    borderTopRightRadius: SCREEN_WIDTH * 0.5,
-  },
-  bottomContent: {
-    paddingBottom: sw(40),
     alignItems: 'center',
   },
   toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm,
   },
   toggleText: {
+    color: Colors.textSecondary,
     fontSize: FontSize.md,
-    color: Colors.brown,
   },
   toggleLink: {
+    color: Colors.textPrimary,
     fontSize: FontSize.md,
-    fontWeight: '700',
-    color: Colors.brownDark,
-    textDecorationLine: 'underline',
+    fontWeight: 'bold',
+  },
+  bottomWaveDecor: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    height: sw(100),
+    justifyContent: 'flex-end',
+  },
+  bottomWaveBg: {
+    backgroundColor: PURPLE,
+    height: sw(80),
+    borderTopLeftRadius: SCREEN_WIDTH * 0.25,
+    borderTopRightRadius: SCREEN_WIDTH * 0.25,
+    transform: [{ scaleX: 1.2 }],
+  },
+  bottomWaveCurve: {
+    position: 'absolute',
+    bottom: sw(40),
+    alignSelf: 'center',
+    width: sw(120),
+    height: sw(120),
+    backgroundColor: Colors.white,
+    borderRadius: sw(60),
+    zIndex: 1,
   },
 });

@@ -44,7 +44,7 @@ function TodayIndicator() {
           width: sw(36),
           height: sw(36),
           borderRadius: sw(18),
-          backgroundColor: Colors.brown,
+          backgroundColor: Colors.brownDark,
           zIndex: -1,
         },
         animatedStyle
@@ -99,6 +99,8 @@ export default function CalendarScreen() {
   // Calculate marked dates for the calendar
   const markedDates = useMemo(() => {
     const marks: any = {};
+    const todayDate = new Date();
+    todayDate.setHours(0,0,0,0);
     
     // Mark tasks
     tasks.forEach(task => {
@@ -106,7 +108,7 @@ export default function CalendarScreen() {
       if (d) {
         const dateStr = format(d, 'yyyy-MM-dd');
         if (!marks[dateStr]) {
-          marks[dateStr] = { marked: true, icons: [] };
+          marks[dateStr] = { marked: true, icons: [], isPast: false };
         }
         if (marks[dateStr].icons.length < 3) {
           marks[dateStr].icons.push(task.icon || 'calendar');
@@ -116,35 +118,48 @@ export default function CalendarScreen() {
 
     // Mark selected date
     if (!marks[selectedDateString]) {
-      marks[selectedDateString] = { icons: [] };
+      marks[selectedDateString] = { icons: [], isPast: false };
     }
     marks[selectedDateString].selected = true;
 
+    // Mark past days with purple progress bullet
+    const currentMonth = selectedDate.getMonth();
+    const currentYear = selectedDate.getFullYear();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    for (let i = 1; i <= daysInMonth; i++) {
+      const d = new Date(currentYear, currentMonth, i);
+      d.setHours(0,0,0,0);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      if (d < todayDate) {
+        if (!marks[dateStr]) marks[dateStr] = { icons: [] };
+        marks[dateStr].isPast = true;
+      }
+    }
+
     return marks;
-  }, [tasks, selectedDateString]);
+  }, [tasks, selectedDateString, selectedDate]);
 
-  const handleAddTask = async () => {
-    if (!taskTitle.trim()) return;
-    
-    await addTask({
-      title: taskTitle,
-      description: taskDesc,
-      date: selectedDate,
-      deadlineTime: timeType === 'target' ? targetTime : undefined,
-      scheduledStart: timeType === 'schedule' ? waktuMulai : undefined,
-      scheduledEnd: timeType === 'schedule' ? waktuSelesai : undefined,
-      icon: selectedIcon,
-      category: 'schedule',
-      showOnWidget: true,
-      reminder: false,
-      reminderDays: []
-    });
-    
-    setTaskTitle('');
-    setTaskDesc('');
-    setShowAddTask(false);
-  };
-
+const handleAddTask = async () => {
+  if (!taskTitle.trim()) return;
+  
+  await addTask({
+    title: taskTitle,
+    description: taskDesc,
+    date: selectedDate,
+    deadlineTime: timeType === 'target' ? targetTime : undefined,
+    scheduledStart: timeType === 'schedule' ? waktuMulai : undefined,
+    scheduledEnd: timeType === 'schedule' ? waktuSelesai : undefined,
+    icon: selectedIcon,
+    category: 'schedule',
+    showOnWidget: true,
+    reminder: true,        
+    reminderDays: [7, 3, 2, 1]  
+  });
+  
+  setTaskTitle('');
+  setTaskDesc('');
+  setShowAddTask(false);
+};
   const renderTimePicker = (value: Date, onChange: (d: Date) => void, onClose: () => void) => {
     if (Platform.OS === 'ios') {
       return (
@@ -199,6 +214,7 @@ export default function CalendarScreen() {
               const mark = markedDates[date.dateString as keyof typeof markedDates] as any;
               const isSelected = mark?.selected;
               const icons = mark?.icons || [];
+              const isPast = mark?.isPast;
               const isToday = date.dateString === format(new Date(), 'yyyy-MM-dd');
 
               return (
@@ -206,6 +222,7 @@ export default function CalendarScreen() {
                   onPress={() => setSelectedDate(new Date(date.timestamp))}
                   style={[
                     styles.dayContainer,
+                    isPast && !isSelected && styles.dayContainerPast,
                     isSelected && styles.dayContainerSelected
                   ]}
                 >
@@ -213,7 +230,8 @@ export default function CalendarScreen() {
                   <Text style={[
                     styles.dayText,
                     state === 'disabled' && styles.dayTextDisabled,
-                    isToday && !isSelected && { color: Colors.brownDark, fontWeight: '700' },
+                    isPast && !isSelected && { color: Colors.white, fontWeight: '600' },
+                    isToday && !isSelected && { color: Colors.white, fontWeight: '700' },
                     isSelected && styles.dayTextSelected
                   ]}>
                     {date.day}
@@ -226,7 +244,7 @@ export default function CalendarScreen() {
                           key={idx} 
                           name={iconName as any} 
                           size={10} 
-                          color={isSelected ? Colors.white : Colors.brownDark} 
+                          color={isSelected ? Colors.white : isPast ? Colors.white : Colors.brownDark} 
                         />
                       ))}
                     </View>
@@ -237,16 +255,16 @@ export default function CalendarScreen() {
               );
             }}
             theme={{
-              backgroundColor: Colors.white,
-              calendarBackground: Colors.white,
-              textSectionTitleColor: Colors.brown,
+              backgroundColor: Colors.beige,
+              calendarBackground: Colors.beige,
+              textSectionTitleColor: Colors.textSecondary,
               selectedDayBackgroundColor: Colors.brownDark,
               selectedDayTextColor: Colors.white,
               todayTextColor: Colors.brownDark,
               dayTextColor: Colors.textPrimary,
               textDisabledColor: Colors.textMuted,
               arrowColor: Colors.brownDark,
-              monthTextColor: Colors.brownDark,
+              monthTextColor: Colors.textPrimary,
               textDayFontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter_400Regular',
               textMonthFontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter_700Bold',
               textDayHeaderFontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter_500Medium',
@@ -471,18 +489,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.beige,
     ...Shadow.sm,
     zIndex: 10,
   },
   headerTitle: {
     fontSize: FontSize.lg,
     fontWeight: '700',
-    color: Colors.brownDark,
+    color: Colors.textPrimary,
   },
   backBtn: { padding: Spacing.sm },
   calendarCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.beige,
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     borderRadius: Radius.lg,
@@ -506,13 +524,13 @@ const styles = StyleSheet.create({
   formDateText: { 
     fontSize: FontSize.md, 
     fontWeight: '700', 
-    color: Colors.brownDark 
+    color: Colors.textPrimary 
   },
   tambahText: { 
     fontSize: FontSize.md, 
     fontWeight: '600', 
     color: Colors.brownDark,
-    backgroundColor: Colors.beige,
+    backgroundColor: Colors.beigeDark,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
@@ -537,16 +555,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.beigeDark,
   },
-  formDateBadgeText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.brownDark },
+  formDateBadgeText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary },
   nameIconRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.sm },
   nameField: { flex: 1 },
   iconField: { width: sw(90) },
   fieldLabel: { fontSize: FontSize.xxs, fontWeight: '700', color: Colors.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.md, letterSpacing: 1 },
-  sectionLabel: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.brownDark, marginBottom: Spacing.md },
-  input: { backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(12), fontSize: FontSize.md, color: Colors.textPrimary },
+  sectionLabel: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  input: { backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(12), fontSize: FontSize.md, color: Colors.textPrimary },
   textArea: { minHeight: sw(80), paddingTop: Spacing.md },
-  iconTrigger: { flexDirection: 'row', alignItems: 'center', gap: sw(4), backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(10) },
-  datePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(14) },
+  iconTrigger: { flexDirection: 'row', alignItems: 'center', gap: sw(4), backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(10) },
+  datePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(14) },
   datePickerText: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '600' },
   typeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
   typeBtn: { flex: 1, paddingVertical: sw(10), alignItems: 'center', backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder },
@@ -566,7 +584,7 @@ const styles = StyleSheet.create({
   line: { width: 2, flex: 1, backgroundColor: Colors.beige, marginTop: -sw(2) },
   taskContent: { 
     flex: 1, 
-    backgroundColor: Colors.white, 
+    backgroundColor: Colors.beige, 
     padding: Spacing.md, 
     borderRadius: Radius.xl, 
     borderLeftWidth: 4,
@@ -598,10 +616,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: sw(38),
     height: sw(46),
-    borderRadius: Radius.lg,
+    borderRadius: Radius.full,
+  },
+  dayContainerPast: {
+    backgroundColor: Colors.brownDark,
   },
   dayContainerSelected: {
     backgroundColor: Colors.brownDark,
+    borderWidth: 2,
+    borderColor: Colors.white,
   },
   dayText: {
     fontSize: FontSize.md,

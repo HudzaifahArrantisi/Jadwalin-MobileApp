@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, TextInput, ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -9,9 +10,19 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
   withTiming, FadeInDown, FadeIn,
 } from 'react-native-reanimated';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { signInWithEmail, signInWithGoogle } from '@/services/auth.service';
-import { Colors, Spacing, FontSize, Radius, sw, Shadow, SCREEN_WIDTH } from '@/constants/theme';
+import { Colors, Spacing, FontSize, Radius, sw, Shadow } from '@/constants/theme';
+import { Env } from '@/constants/env';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Required for web-based auth redirects to complete properly
+WebBrowser.maybeCompleteAuthSession();
+
+const PURPLE = '#7C3AED';
+const LIGHT_PURPLE = '#8B5CF6';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -20,25 +31,57 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // Animations
-  const logoScale = useSharedValue(0.5);
-  const logoOpacity = useSharedValue(0);
   const buttonScale = useSharedValue(1);
-
-  useEffect(() => {
-    logoScale.value = withSpring(1, { damping: 12 });
-    logoOpacity.value = withTiming(1, { duration: 600 });
-  }, []);
-
-  const logoAnim = useAnimatedStyle(() => ({
-    transform: [{ scale: logoScale.value }],
-    opacity: logoOpacity.value,
-  }));
 
   const btnAnim = useAnimatedStyle(() => ({
     transform: [{ scale: buttonScale.value }],
   }));
+
+  const isAndroid = Platform.OS === 'android';
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: Env.GOOGLE_WEB_CLIENT_ID,
+    androidClientId: isAndroid ? Env.GOOGLE_ANDROID_CLIENT_ID : undefined,
+    iosClientId: isAndroid ? undefined : 'disabled',
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      if (id_token) {
+        handleGoogleCredential(id_token);
+      }
+    } else if (response?.type === 'error') {
+      Alert.alert('Google Sign-In Gagal', response.error?.message || 'Terjadi kesalahan');
+      setIsGoogleLoading(false);
+    } else if (response?.type === 'dismiss') {
+      setIsGoogleLoading(false);
+    }
+  }, [response]);
+
+  const handleGoogleCredential = async (idToken: string) => {
+    try {
+      await signInWithGoogle(idToken);
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      console.error('Firebase Google Sign-In error:', error);
+      Alert.alert('Google Sign-In Gagal', error.message || 'Terjadi kesalahan saat sign-in dengan Google.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      await promptAsync();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Tidak dapat memulai Google Sign-In');
+      setIsGoogleLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -66,93 +109,28 @@ export default function LoginScreen() {
     }
   };
 
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-
-  // Configure Google Sign-In on mount
-  useEffect(() => {
-    GoogleSignin.configure({
-      // webClientId from Firebase Console > Authentication > Sign-in method > Google
-      // This is the "Web client ID" (NOT Android client ID)
-      webClientId: '55725704462-sbcnip5b0o9rqvck360ak16g4hm7qrfc.apps.googleusercontent.com',
-    });
-  }, []);
-
-  const handleGoogleSignIn = async () => {
-    setIsGoogleLoading(true);
-    try {
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      const signInResult = await GoogleSignin.signIn();
-
-      // Get the idToken from the sign-in result
-      const idToken = signInResult?.data?.idToken;
-      if (!idToken) {
-        throw new Error('Google Sign-In berhasil tapi tidak mendapat token.');
-      }
-
-      // Pass idToken to Firebase auth
-      await signInWithGoogle(idToken);
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // User cancelled — do nothing
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        Alert.alert('Info', 'Proses sign-in sedang berjalan...');
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert('Error', 'Google Play Services tidak tersedia di perangkat ini.');
-      } else {
-        console.error('Google Sign-In error:', error);
-        Alert.alert('Google Sign-In Gagal', error.message || 'Terjadi kesalahan saat sign-in dengan Google.');
-      }
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  };
-
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ── Top Wave Section (Beige) ── */}
-          <View style={styles.topWave}>
-            <Animated.View style={[styles.logoContainer, logoAnim]}>
-              <View style={styles.logoCircle}>
-                <Ionicons name="calendar" size={sw(36)} color={Colors.white} />
-                <Text style={{ color: Colors.white, fontSize: sw(10), fontWeight: 'bold', marginTop: sw(2) }}>Jadwalin</Text>
-              </View>
-            </Animated.View>
-            {/* Curved bottom edge */}
-            <View style={styles.waveCurve} />
+      {/* Decorative top wave */}
+      <View style={styles.topWaveDecor} />
+      
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          
+          <View style={styles.headerSection}>
+            <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
+              Log In
+            </Animated.Text>
           </View>
 
-          {/* ── Form Section (White/Cream) ── */}
           <View style={styles.formSection}>
-            <Animated.View entering={FadeIn.delay(200).duration(500)}>
-              <Text style={styles.formTitle}>Login</Text>
-              <Text style={styles.formSubtitle}>
-                Selamat datang kembali,{'\n'}
-                Masuk untuk melanjutkan jadwalmu
-              </Text>
-            </Animated.View>
-
-            {/* Email Input */}
-            <Animated.View
-              entering={FadeInDown.delay(300).duration(400)}
-              style={styles.inputWrapper}
-            >
-              <Text style={styles.inputLabel}>Email</Text>
+            <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+                <Ionicons name="mail-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="email@contoh.com"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholder="User name or email"
+                  placeholderTextColor="#9CA3AF"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -162,102 +140,84 @@ export default function LoginScreen() {
               </View>
             </Animated.View>
 
-            {/* Password Input */}
-            <Animated.View
-              entering={FadeInDown.delay(400).duration(400)}
-              style={styles.inputWrapper}
-            >
-              <View style={styles.labelRow}>
-                <Text style={styles.inputLabel}>Password</Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                  <Text style={styles.forgotLink}>Lupa password?</Text>
-                </TouchableOpacity>
-              </View>
+            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={sw(18)} color={Colors.brown} style={styles.inputIcon} />
+                <Ionicons name="lock-closed-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Masukkan password"
-                  placeholderTextColor={Colors.textMuted}
+                  placeholder="Password"
+                  placeholderTextColor="#9CA3AF"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={sw(20)}
-                    color={Colors.brown}
-                  />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={sw(20)} color={PURPLE} />
                 </TouchableOpacity>
               </View>
             </Animated.View>
 
-            {/* Sign In Button */}
-            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={{ marginTop: Spacing.lg }}>
+            <Animated.View entering={FadeInDown.delay(450).duration(400)} style={styles.rememberForgotRow}>
+              <Text style={styles.rememberText}>Remember me</Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={{ marginTop: Spacing.xl }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
-                onPressIn={() => { buttonScale.value = withSpring(0.97); }}
-                onPressOut={() => { buttonScale.value = withSpring(1); }}
-                onPress={handleLogin}
-                disabled={isLoading}
-                activeOpacity={1}
-                style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={Colors.white} size="small" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
-
-          {/* Divider */}
-            <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>atau</Text>
-              <View style={styles.divider} />
+                  onPressIn={() => { buttonScale.value = withSpring(0.97); }}
+                  onPressOut={() => { buttonScale.value = withSpring(1); }}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                  activeOpacity={0.9}
+                  style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color={PURPLE} size="small" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Log In</Text>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </Animated.View>
 
-            {/* Google Sign In */}
-            <Animated.View entering={FadeInDown.delay(650).duration(400)}>
-              <TouchableOpacity
-                style={[styles.googleButton, { opacity: isGoogleLoading ? 0.7 : 1 }]}
-                onPress={handleGoogleSignIn}
-                activeOpacity={0.7}
-                disabled={isGoogleLoading || isLoading}
-              >
-                {isGoogleLoading ? (
-                  <ActivityIndicator color={Colors.brownDark} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="logo-google" size={sw(18)} color={Colors.brownDark} />
-                    <Text style={styles.googleButtonText}>Masuk dengan Google</Text>
-                  </>
-                )}
+            {isAndroid && (
+              <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.socialLoginContainer}>
+                <Text style={styles.socialLoginText}>Log IN with</Text>
+                <TouchableOpacity
+                  style={[styles.googleButton, { opacity: (isGoogleLoading || !request) ? 0.7 : 1 }]}
+                  onPress={handleGoogleSignIn}
+                  activeOpacity={0.7}
+                  disabled={isGoogleLoading || isLoading || !request}
+                >
+                  {isGoogleLoading ? (
+                    <ActivityIndicator color={Colors.white} size="small" />
+                  ) : (
+                    <Ionicons name="logo-google" size={sw(20)} color={Colors.white} />
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+            
+            <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.footerRow}>
+              <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={styles.toggleRow}>
+                <Text style={styles.toggleText}>Don't have an account? </Text>
+                <Text style={styles.toggleLink}>Sign Up</Text>
               </TouchableOpacity>
             </Animated.View>
+            
           </View>
 
-          {/* ── Bottom Wave Section (Beige) ── */}
-          <View style={styles.bottomWave}>
-            <View style={styles.bottomWaveCurve} />
-            <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.bottomContent}>
-              <TouchableOpacity
-                onPress={() => router.push('/(auth)/register')}
-                style={styles.toggleRow}
-              >
-                <Text style={styles.toggleText}>Belum punya akun? </Text>
-                <Text style={styles.toggleLink}>Buat akun</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Decorative bottom wave */}
+      <View style={styles.bottomWaveDecor}>
+        <View style={styles.bottomWaveCurveBg} />
+        <View style={styles.bottomWaveCurveFg} />
+      </View>
     </View>
   );
 }
@@ -265,187 +225,154 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.cream,
+    backgroundColor: PURPLE,
+    position: 'relative',
+  },
+  topWaveDecor: {
+    position: 'absolute',
+    top: -SCREEN_WIDTH * 0.2,
+    right: -SCREEN_WIDTH * 0.2,
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
+    borderRadius: SCREEN_WIDTH * 0.4,
+    backgroundColor: LIGHT_PURPLE,
+    opacity: 0.5,
+  },
+  bottomWaveDecor: {
+    position: 'absolute',
+    bottom: -sw(60),
+    width: SCREEN_WIDTH,
+    height: sw(150),
+    zIndex: -1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  bottomWaveCurveBg: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 1.5,
+    height: sw(180),
+    backgroundColor: '#4C1D95', // Darker purple
+    borderTopLeftRadius: SCREEN_WIDTH,
+    borderTopRightRadius: SCREEN_WIDTH,
+    transform: [{ scaleX: 1.2 }],
+    bottom: sw(20),
+  },
+  bottomWaveCurveFg: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 1.5,
+    height: sw(150),
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: SCREEN_WIDTH,
+    borderTopRightRadius: SCREEN_WIDTH,
+    transform: [{ scaleX: 1.2 }, { translateX: SCREEN_WIDTH * 0.1 }],
+    bottom: -sw(50),
   },
   scrollContent: {
     flexGrow: 1,
-  },
-
-  // ─── Top Wave ───
-  topWave: {
-    backgroundColor: Colors.beige,
-    paddingTop: sw(60),
-    paddingBottom: sw(50),
-    alignItems: 'center',
-    position: 'relative',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  logoCircle: {
-    width: sw(72),
-    height: sw(72),
-    borderRadius: sw(36),
-    backgroundColor: Colors.brownDark,
-    alignItems: 'center',
     justifyContent: 'center',
-    ...Shadow.lg,
+    paddingBottom: sw(60),
   },
-  waveCurve: {
-    position: 'absolute',
-    bottom: -sw(30),
-    left: 0,
-    right: 0,
-    height: sw(60),
-    backgroundColor: Colors.beige,
-    borderBottomLeftRadius: SCREEN_WIDTH * 0.5,
-    borderBottomRightRadius: SCREEN_WIDTH * 0.5,
-    zIndex: 1,
+  headerSection: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: sw(80),
+    paddingBottom: sw(40),
   },
-
-  // ─── Form ───
+  headerTitle: {
+    fontSize: sw(46),
+    fontWeight: 'bold',
+    color: Colors.white,
+    letterSpacing: 1,
+  },
   formSection: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: sw(40),
-    zIndex: 0,
-  },
-  formTitle: {
-    fontSize: sw(28),
-    fontWeight: '800',
-    color: Colors.brownDark,
-    marginBottom: sw(6),
-    letterSpacing: -0.5,
-  },
-  formSubtitle: {
-    fontSize: FontSize.md,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xl,
-    lineHeight: sw(22),
+    paddingHorizontal: Spacing.xl,
+    width: '100%',
+    maxWidth: 500, // Tablet support
+    alignSelf: 'center',
   },
   inputWrapper: {
-    marginBottom: Spacing.md,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  inputLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  forgotLink: {
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-    color: Colors.brownDark,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.lg,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    height: sw(52),
+    borderRadius: 999, // Pill shape
+    paddingHorizontal: Spacing.lg,
+    height: sw(56),
     backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
+    ...Shadow.sm,
   },
   inputIcon: {
-    marginRight: Spacing.sm,
+    marginRight: Spacing.md,
   },
   input: {
     flex: 1,
     fontSize: FontSize.md,
     height: '100%',
-    color: Colors.textPrimary,
+    color: PURPLE,
+  },
+  rememberForgotRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: -Spacing.xs,
+  },
+  rememberText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+  },
+  forgotText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: 'bold',
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: sw(52),
-    backgroundColor: Colors.brownDark,
-    borderRadius: Radius.xl,
+    height: sw(56),
+    backgroundColor: Colors.white,
+    borderRadius: 999,
     ...Shadow.md,
   },
   primaryButtonText: {
-    color: Colors.white,
+    color: PURPLE,
     fontSize: FontSize.lg,
-    fontWeight: '700',
+    fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.lg,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.inputBorder,
-  },
-  dividerText: {
-    marginHorizontal: Spacing.md,
-    fontSize: FontSize.sm,
-    color: Colors.textMuted,
-  },
-  googleButton: {
+  socialLoginContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: sw(52),
-    borderRadius: Radius.xl,
-    borderWidth: 1.5,
-    borderColor: Colors.inputBorder,
-    backgroundColor: Colors.white,
-    gap: Spacing.sm,
+    marginTop: sw(30),
+    gap: Spacing.md,
   },
-  googleButtonText: {
+  socialLoginText: {
+    color: Colors.white,
     fontSize: FontSize.md,
     fontWeight: '600',
-    color: Colors.brownDark,
   },
-
-  // ─── Bottom Wave ───
-  bottomWave: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    minHeight: sw(100),
-    backgroundColor: Colors.beige,
+  googleButton: {
+    width: sw(44),
+    height: sw(44),
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerRow: {
     marginTop: sw(30),
-    position: 'relative',
-  },
-  bottomWaveCurve: {
-    position: 'absolute',
-    top: -sw(30),
-    left: 0,
-    right: 0,
-    height: sw(60),
-    backgroundColor: Colors.beige,
-    borderTopLeftRadius: SCREEN_WIDTH * 0.5,
-    borderTopRightRadius: SCREEN_WIDTH * 0.5,
-  },
-  bottomContent: {
-    paddingBottom: sw(40),
     alignItems: 'center',
   },
   toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm,
   },
   toggleText: {
+    color: 'rgba(255,255,255,0.8)',
     fontSize: FontSize.md,
-    color: Colors.brown,
   },
   toggleLink: {
+    color: Colors.white,
     fontSize: FontSize.md,
-    fontWeight: '700',
-    color: Colors.brownDark,
+    fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
 });
