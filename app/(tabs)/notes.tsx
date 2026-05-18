@@ -19,23 +19,37 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { useNotes } from '@/hooks/useNotes';
 import { NoteList, NoteItem } from '@/types/task.types';
-import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, sh } from '@/constants/theme';
 import InteractivePressable from '@/components/InteractivePressable';
 
 // ─── Note Detail View (Modal - Brown card) ───
 function NoteDetailModal({
-  visible, note, onClose, onAddItem, onToggleItem, onDeleteItem,
+  visible, note, onClose, onAddItem, onToggleItem, onDeleteItem, onUpdateContent,
 }: {
   visible: boolean; note: NoteList | null; onClose: () => void;
   onAddItem: (text: string) => void; onToggleItem: (itemId: string) => void;
-  onDeleteItem: (itemId: string) => void;
+  onDeleteItem: (itemId: string) => void; onUpdateContent: (content: string) => void;
 }) {
+  const { Colors } = useAppTheme();
+  const detailStyles = React.useMemo(() => getDetailStyles(Colors), [Colors]);
   const [newItemText, setNewItemText] = useState('');
+  const [localContent, setLocalContent] = useState('');
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollView>(null);
 
+  React.useEffect(() => {
+    if (note?.type === 'text') setLocalContent(note.content || '');
+  }, [note]);
+
   if (!note) return null;
+
+  const handleClose = () => {
+    if (note?.type === 'text' && localContent !== note.content) {
+      onUpdateContent(localContent);
+    }
+    onClose();
+  };
 
   const handleAdd = () => {
     if (!newItemText.trim()) return;
@@ -60,7 +74,7 @@ function NoteDetailModal({
         >
           <View style={[detailStyles.container, { paddingTop: insets.top + sw(10) }]}>
             {/* Back Button */}
-            <InteractivePressable style={detailStyles.backBtn} onPress={onClose}>
+            <InteractivePressable style={detailStyles.backBtn} onPress={handleClose}>
               <Ionicons name="arrow-back" size={sw(24)} color={Colors.textPrimary} />
             </InteractivePressable>
 
@@ -73,57 +87,74 @@ function NoteDetailModal({
                 <Text style={detailStyles.cardTitle} numberOfLines={2}>{note.title}</Text>
               </View>
 
-              {/* Items List */}
-              <ScrollView
-                ref={scrollRef}
-                style={detailStyles.itemsScroll}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-              >
-                {note.items.map((item, index) => (
-                  <Animated.View 
-                    key={item.id} 
-                    entering={FadeInRight.delay(index * 50)}
-                    layout={Layout.springify()}
+              {/* Note Content (List or Text) */}
+              {note.type === 'text' ? (
+                <View style={detailStyles.textContentWrapper}>
+                  <TextInput
+                    style={detailStyles.textAreaLarge}
+                    multiline
+                    textAlignVertical="top"
+                    placeholder="Mulai menulis..."
+                    placeholderTextColor={Colors.textMuted}
+                    value={localContent}
+                    onChangeText={setLocalContent}
+                    onBlur={() => onUpdateContent(localContent)}
+                  />
+                </View>
+              ) : (
+                <>
+                  <ScrollView
+                    ref={scrollRef}
+                    style={detailStyles.itemsScroll}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
                   >
-                    <InteractivePressable
-                      style={detailStyles.itemRow}
-                      onPress={() => handleToggle(item.id)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onLongPress={() => {
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                        Alert.alert('Hapus Item', `Hapus "${item.text}"?`, [
-                          { text: 'Batal', style: 'cancel' },
-                          { text: 'Hapus', style: 'destructive', onPress: () => onDeleteItem(item.id) },
-                        ]);
-                      }}
-                    >
-                      <View style={[detailStyles.itemDot, item.completed && detailStyles.itemDotCompleted]} />
-                      <Text style={[detailStyles.itemText, item.completed && detailStyles.itemTextCompleted]}>
-                        {item.text}
-                      </Text>
-                    </InteractivePressable>
-                  </Animated.View>
-                ))}
-              </ScrollView>
+                    {note.items.map((item, index) => (
+                      <Animated.View 
+                        key={item.id} 
+                        entering={FadeInRight.delay(index * 50)}
+                        layout={Layout.springify()}
+                      >
+                        <InteractivePressable
+                          style={detailStyles.itemRow}
+                          onPress={() => handleToggle(item.id)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          onLongPress={() => {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                            Alert.alert('Hapus Item', `Hapus "${item.text}"?`, [
+                              { text: 'Batal', style: 'cancel' },
+                              { text: 'Hapus', style: 'destructive', onPress: () => onDeleteItem(item.id) },
+                            ]);
+                          }}
+                        >
+                          <View style={[detailStyles.itemDot, item.completed && detailStyles.itemDotCompleted]} />
+                          <Text style={[detailStyles.itemText, item.completed && detailStyles.itemTextCompleted]}>
+                            {item.text}
+                          </Text>
+                        </InteractivePressable>
+                      </Animated.View>
+                    ))}
+                  </ScrollView>
 
-              {/* Input pinned at bottom */}
-              <View style={[detailStyles.inputRow, { paddingBottom: insets.bottom || sw(10) }]}>
-                <TextInput
-                  ref={inputRef}
-                  style={detailStyles.input}
-                  placeholder="Tambah item baru..."
-                  placeholderTextColor={Colors.textMuted}
-                  value={newItemText}
-                  onChangeText={setNewItemText}
-                  onSubmitEditing={handleAdd}
-                  returnKeyType="done"
-                />
-                <InteractivePressable onPress={handleAdd} hapticType={Haptics.ImpactFeedbackStyle.Medium}>
-                  <Ionicons name="add-circle" size={sw(32)} color={Colors.textPrimary} />
-                </InteractivePressable>
-              </View>
+                  {/* Input pinned at bottom */}
+                  <View style={[detailStyles.inputRow, { paddingBottom: insets.bottom || sw(10) }]}>
+                    <TextInput
+                      ref={inputRef}
+                      style={detailStyles.input}
+                      placeholder="Tambah item baru..."
+                      placeholderTextColor={Colors.textMuted}
+                      value={newItemText}
+                      onChangeText={setNewItemText}
+                      onSubmitEditing={handleAdd}
+                      returnKeyType="done"
+                    />
+                    <InteractivePressable onPress={handleAdd} hapticType={Haptics.ImpactFeedbackStyle.Medium}>
+                      <Ionicons name="add-circle" size={sw(32)} color={Colors.textPrimary} />
+                    </InteractivePressable>
+                  </View>
+                </>
+              )}
             </Animated.View>
           </View>
         </KeyboardAvoidingView>
@@ -132,7 +163,7 @@ function NoteDetailModal({
   );
 }
 
-const detailStyles = StyleSheet.create({
+const getDetailStyles = (Colors: any) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: Colors.cream },
   keyboardView: { flex: 1 },
   container: { flex: 1, backgroundColor: Colors.cream },
@@ -161,9 +192,10 @@ const detailStyles = StyleSheet.create({
     paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.borderLight,
   },
   input: {
-    flex: 1, backgroundColor: Colors.white, borderRadius: Radius.md,
     paddingHorizontal: Spacing.md, paddingVertical: sw(10), fontSize: FontSize.md, color: Colors.textPrimary,
   },
+  textContentWrapper: { flex: 1, marginTop: Spacing.md },
+  textAreaLarge: { flex: 1, fontSize: FontSize.md, color: Colors.textPrimary, lineHeight: sw(24) },
 });
 
 // ─── Create Note Sheet ───
@@ -171,10 +203,14 @@ function CreateNoteSheet({
   visible, onClose, onSave,
 }: {
   visible: boolean; onClose: () => void;
-  onSave: (title: string, items: string[]) => void;
+  onSave: (title: string, type: 'list' | 'text', items: string[], content: string) => void;
 }) {
+  const { Colors } = useAppTheme();
+  const sheetStyles = React.useMemo(() => getSheetStyles(Colors), [Colors]);
   const [title, setTitle] = useState('');
+  const [noteType, setNoteType] = useState<'list'|'text'>('list');
   const [items, setItems] = useState<string[]>(['']);
+  const [content, setContent] = useState('');
   const insets = useSafeAreaInsets();
 
   const addItem = () => {
@@ -194,8 +230,8 @@ function CreateNoteSheet({
     if (!title.trim()) { Alert.alert('Error', 'Judul note wajib diisi'); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const validItems = items.filter((i) => i.trim().length > 0);
-    onSave(title.trim(), validItems);
-    setTitle(''); setItems(['']);
+    onSave(title.trim(), noteType, validItems, content.trim());
+    setTitle(''); setItems(['']); setContent(''); setNoteType('list');
   };
 
   if (!visible) return null;
@@ -226,30 +262,56 @@ function CreateNoteSheet({
               <TextInput style={sheetStyles.input} placeholder="Contoh: List belanja"
                 placeholderTextColor={Colors.textMuted} value={title} onChangeText={setTitle} />
 
-              <Text style={sheetStyles.label}>Item</Text>
-              {items.map((item, idx) => (
-                <Animated.View 
-                  key={idx} 
-                  entering={FadeInRight.delay(idx * 50)} 
-                  layout={Layout.springify()} 
-                  style={sheetStyles.itemRow}
+              <View style={sheetStyles.typeToggleRow}>
+                <InteractivePressable 
+                  style={[sheetStyles.typeToggleBtn, noteType === 'list' && sheetStyles.typeToggleActive]} 
+                  onPress={() => setNoteType('list')}
                 >
-                  <View style={sheetStyles.itemDot} />
-                  <TextInput style={sheetStyles.itemInput} placeholder={`Item ${idx + 1}`}
-                    placeholderTextColor={Colors.textMuted} value={item}
-                    onChangeText={(text) => updateItem(idx, text)} />
-                  {items.length > 1 && (
-                    <InteractivePressable onPress={() => removeItem(idx)}>
-                      <Ionicons name="close-circle" size={sw(20)} color={Colors.textMuted} />
-                    </InteractivePressable>
-                  )}
-                </Animated.View>
-              ))}
+                  <Text style={[sheetStyles.typeToggleText, noteType === 'list' && sheetStyles.typeToggleTextActive]}>Checklist</Text>
+                </InteractivePressable>
+                <InteractivePressable 
+                  style={[sheetStyles.typeToggleBtn, noteType === 'text' && sheetStyles.typeToggleActive]} 
+                  onPress={() => setNoteType('text')}
+                >
+                  <Text style={[sheetStyles.typeToggleText, noteType === 'text' && sheetStyles.typeToggleTextActive]}>Bebas</Text>
+                </InteractivePressable>
+              </View>
 
-              <InteractivePressable style={sheetStyles.addItemBtn} onPress={addItem}>
-                <Ionicons name="add" size={sw(18)} color={Colors.brown} />
-                <Text style={sheetStyles.addItemText}>Tambah Item</Text>
-              </InteractivePressable>
+              {noteType === 'list' ? (
+                <>
+                  <Text style={sheetStyles.label}>Item</Text>
+                  {items.map((item, idx) => (
+                    <Animated.View 
+                      key={idx} 
+                      entering={FadeInRight.delay(idx * 50)} 
+                      layout={Layout.springify()} 
+                      style={sheetStyles.itemRow}
+                    >
+                      <View style={sheetStyles.itemDot} />
+                      <TextInput style={sheetStyles.itemInput} placeholder={`Item ${idx + 1}`}
+                        placeholderTextColor={Colors.textMuted} value={item}
+                        onChangeText={(text) => updateItem(idx, text)} />
+                      {items.length > 1 && (
+                        <InteractivePressable onPress={() => removeItem(idx)}>
+                          <Ionicons name="close-circle" size={sw(20)} color={Colors.textMuted} />
+                        </InteractivePressable>
+                      )}
+                    </Animated.View>
+                  ))}
+
+                  <InteractivePressable style={sheetStyles.addItemBtn} onPress={addItem}>
+                    <Ionicons name="add" size={sw(18)} color={Colors.brown} />
+                    <Text style={sheetStyles.addItemText}>Tambah Item</Text>
+                  </InteractivePressable>
+                </>
+              ) : (
+                <View>
+                  <Text style={sheetStyles.label}>Isi Catatan</Text>
+                  <TextInput style={[sheetStyles.input, sheetStyles.textArea]} placeholder="Mulai menulis cerita/catatan..."
+                    placeholderTextColor={Colors.textMuted} value={content} onChangeText={setContent}
+                    multiline numberOfLines={5} textAlignVertical="top" />
+                </View>
+              )}
             </ScrollView>
           </Animated.View>
         </View>
@@ -258,7 +320,7 @@ function CreateNoteSheet({
   );
 }
 
-const sheetStyles = StyleSheet.create({
+const getSheetStyles = (Colors: any) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
   container: {
     backgroundColor: Colors.cream, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl,
@@ -269,13 +331,13 @@ const sheetStyles = StyleSheet.create({
   saveText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.brown },
   label: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.md },
   input: {
-    backgroundColor: Colors.white, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.inputBorder,
+    backgroundColor: Colors.inputBg, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.inputBorder,
     paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: FontSize.md, color: Colors.textPrimary,
   },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
   itemDot: { width: sw(8), height: sw(8), borderRadius: sw(4), backgroundColor: Colors.brown },
   itemInput: {
-    flex: 1, backgroundColor: Colors.white, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.inputBorder,
+    flex: 1, backgroundColor: Colors.inputBg, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.inputBorder,
     paddingHorizontal: Spacing.md, paddingVertical: sw(10), fontSize: FontSize.sm, color: Colors.textPrimary,
   },
   addItemBtn: {
@@ -284,10 +346,18 @@ const sheetStyles = StyleSheet.create({
     borderColor: Colors.inputBorder, justifyContent: 'center', marginTop: Spacing.sm, marginBottom: Spacing.lg,
   },
   addItemText: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.brown },
+  textArea: { minHeight: sw(120) },
+  typeToggleRow: { flexDirection: 'row', backgroundColor: Colors.inputBg, borderRadius: Radius.md, padding: sw(4), marginTop: Spacing.md, borderWidth: 1, borderColor: Colors.inputBorder },
+  typeToggleBtn: { flex: 1, paddingVertical: sw(8), alignItems: 'center', borderRadius: Radius.sm },
+  typeToggleActive: { backgroundColor: Colors.white, ...Shadow.sm },
+  typeToggleText: { fontSize: FontSize.sm, color: Colors.textMuted, fontWeight: '600' },
+  typeToggleTextActive: { color: Colors.brown, fontWeight: '700' },
 });
 
 // ─── Main Notes Screen ───
 export default function NotesScreen() {
+  const { Colors } = useAppTheme();
+  const styles = React.useMemo(() => getStyles(Colors), [Colors]);
   const { notes, notesLoading, addNote, editNote, removeNote, toggleNoteItem } = useNotes();
   const insets = useSafeAreaInsets();
   const [showCreateSheet, setShowCreateSheet] = useState(false);
@@ -296,14 +366,24 @@ export default function NotesScreen() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
-  const handleCreateNote = async (title: string, items: string[]) => {
+  const handleCreateNote = async (title: string, type: 'list' | 'text', items: string[], content: string) => {
     try {
       await addNote({
         title, emoji: '📝', color: Colors.pastelGreen,
-        items: items.map((text, idx) => ({ text, completed: false, order: idx })),
+        type, content,
+        items: type === 'list' ? items.map((text, idx) => ({ text, completed: false, order: idx })) : [],
       });
       setShowCreateSheet(false);
     } catch (error: any) { Alert.alert('Error', error.message || 'Gagal membuat note'); }
+  };
+
+  const handleUpdateContent = async (newContent: string) => {
+    if (!selectedNote) return;
+    try {
+      await editNote(selectedNote.id, { content: newContent });
+      // update local immediately
+      setSelectedNote(prev => prev ? { ...prev, content: newContent } : null);
+    } catch (error: any) { Alert.alert('Error', error.message); }
   };
 
   const handleOpenDetail = (note: NoteList) => { 
@@ -473,7 +553,14 @@ export default function NotesScreen() {
                     />
                   )}
                   <View style={styles.noteItemDot} />
-                  <Text style={styles.noteItemTitle} numberOfLines={1}>{note.title}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.noteItemTitle} numberOfLines={1}>{note.title}</Text>
+                    {note.type === 'text' && note.content ? (
+                      <Text style={styles.noteItemSnippet} numberOfLines={1}>{note.content}</Text>
+                    ) : note.items && note.items.length > 0 ? (
+                      <Text style={styles.noteItemSnippet}>{note.items.length} item</Text>
+                    ) : null}
+                  </View>
                   {!isSelectionMode && <Ionicons name="chevron-forward" size={sw(20)} color={Colors.textSecondary} />}
                 </InteractivePressable>
               </Animated.View>
@@ -502,12 +589,13 @@ export default function NotesScreen() {
       <CreateNoteSheet visible={showCreateSheet} onClose={() => setShowCreateSheet(false)} onSave={handleCreateNote} />
       <NoteDetailModal visible={showDetail} note={selectedNote}
         onClose={() => { setShowDetail(false); setSelectedNote(null); }}
-        onAddItem={handleAddItemToNote} onToggleItem={handleToggleItemInDetail} onDeleteItem={handleDeleteItemInDetail} />
+        onAddItem={handleAddItemToNote} onToggleItem={handleToggleItemInDetail} onDeleteItem={handleDeleteItemInDetail}
+        onUpdateContent={handleUpdateContent} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.cream },
   backBtn: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
   writeSection: { backgroundColor: Colors.dailyCardBg, marginHorizontal: Spacing.md, borderRadius: Radius.xxl, padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadow.md },
@@ -518,7 +606,8 @@ const styles = StyleSheet.create({
   noteListTitle: { fontSize: FontSize.xl, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md, paddingHorizontal: sw(4) },
   noteItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.pastelGreen, borderRadius: Radius.xl, paddingHorizontal: Spacing.md, paddingVertical: sw(16), marginBottom: Spacing.sm, ...Shadow.sm },
   noteItemDot: { width: sw(8), height: sw(8), borderRadius: sw(4), backgroundColor: Colors.textMuted, marginRight: Spacing.sm },
-  noteItemTitle: { flex: 1, fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary },
+  noteItemTitle: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary },
+  noteItemSnippet: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: sw(2) },
   emptyState: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.sm },
   emptyText: { fontSize: FontSize.md, color: Colors.textMuted },
   listHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, paddingHorizontal: sw(4) },
@@ -534,3 +623,5 @@ const styles = StyleSheet.create({
   selectionBarBtn: { fontSize: FontSize.md, fontWeight: '700', color: Colors.brown },
   selectionBarCount: { fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecondary },
 });
+
+// Force fast refresh 1

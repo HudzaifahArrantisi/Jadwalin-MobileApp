@@ -46,7 +46,9 @@ export function useTasks() {
       setTasks(updatedTasks);
       setLoading(false);
       // Auto-sync widget data whenever tasks change
-      syncWidgetData(updatedTasks).catch(() => {});
+      syncWidgetData(updatedTasks).catch((err) => {
+        console.warn('[useTasks] Widget sync failed:', err);
+      });
     });
 
     return unsubscribe;

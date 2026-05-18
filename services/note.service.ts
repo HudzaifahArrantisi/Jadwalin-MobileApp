@@ -36,6 +36,8 @@ function docToNote(docSnap: any): NoteList {
     title: data.title || '',
     emoji: data.emoji || '📝',
     color: data.color || '#7C3AED',
+    type: data.type || 'list',
+    content: data.content || '',
     items: (data.items || []).map((item: any, idx: number) => ({
       id: item.id || `item-${idx}`,
       text: item.text || '',
@@ -55,10 +57,11 @@ export async function createNoteList(
   input: CreateNoteListInput
 ): Promise<NoteList> {
   const now = serverTimestamp();
-  const noteData = {
+  const noteData: any = {
     title: input.title.trim(),
     emoji: input.emoji,
     color: input.color,
+    type: input.type || 'list',
     items: input.items.map((item, idx) => ({
       id: `item-${Date.now()}-${idx}`,
       text: item.text,
@@ -68,6 +71,8 @@ export async function createNoteList(
     createdAt: now,
     updatedAt: now,
   };
+
+  if (input.content !== undefined) noteData.content = input.content;
 
   const docRef = await addDoc(notesRef(userId), noteData);
 
@@ -93,6 +98,8 @@ export async function updateNoteList(
   if (input.title !== undefined) updateData.title = input.title.trim();
   if (input.emoji !== undefined) updateData.emoji = input.emoji;
   if (input.color !== undefined) updateData.color = input.color;
+  if (input.type !== undefined) updateData.type = input.type;
+  if (input.content !== undefined) updateData.content = input.content;
   if (input.items !== undefined) updateData.items = input.items;
 
   await updateDoc(noteRef, updateData);

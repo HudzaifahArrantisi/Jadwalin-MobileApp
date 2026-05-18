@@ -8,8 +8,12 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 
+import { useAppTheme } from '@/constants/theme';
+
 export default function AddTaskScreen() {
   const router = useRouter();
+  const { Colors } = useAppTheme();
+  const styles = getStyles(Colors);
 
   useEffect(() => {
     // Redirect to calendar page since add task is now
@@ -24,7 +28,7 @@ export default function AddTaskScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.cream,

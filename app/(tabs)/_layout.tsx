@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import { Colors, Spacing, sw, SCREEN_WIDTH } from '@/constants/theme';
+import { useAppTheme, Spacing, sw, SCREEN_WIDTH } from '@/constants/theme';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useMemo } from 'react';
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { Colors } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors), [Colors]);
   // We only want to show the first 4 tabs (index, notes, calendar, settings)
   // `settings` is the profile button
 
@@ -48,7 +51,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               onPress={onPress}
               style={styles.tabItem}
             >
-              <Ionicons name={iconName as any} size={sw(24)} color={Colors.black} />
+              <Ionicons name={iconName as any} size={sw(24)} color={Colors.textPrimary} />
               <Text style={styles.tabLabel}>{label}</Text>
             </TouchableOpacity>
           );
@@ -99,7 +102,7 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   tabBarContainer: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? sw(30) : sw(20),

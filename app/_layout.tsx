@@ -5,12 +5,12 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskStore } from '@/store/taskStore';
 import { requestNotificationPermission } from '@/services/notification.service';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/constants/theme';
 
 // Ignore harmless Firebase connectivity warnings in development
 LogBox.ignoreLogs([
@@ -26,6 +26,7 @@ export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const hasSeenOnboarding = useTaskStore((s) => s.hasSeenOnboarding);
+  const { Colors, isDark } = useAppTheme();
 
   const [appReady, setAppReady] = useState(false);
 
@@ -37,6 +38,8 @@ export default function RootLayout() {
     Inter_700Bold,
     Inter_800ExtraBold,
   });
+
+  const [showSplash, setShowSplash] = useState(true);
 
   // App initialization
   useEffect(() => {
@@ -58,10 +61,11 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, isAuthLoading]);
 
-  // Hide splash and navigate
+  // Hide native splash, handle navigation, and start custom splash fade-out
   useEffect(() => {
     if (!appReady) return;
 
+    // Hide the native splash screen immediately so our animated one takes over
     SplashScreen.hideAsync();
 
     const inAuthGroup = segments[0] === '(auth)';
@@ -76,12 +80,19 @@ export default function RootLayout() {
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/(tabs)');
     }
+
+    // Keep our beautiful animated splash overlay visible for 2 seconds
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2200);
+
+    return () => clearTimeout(timer);
   }, [appReady, isAuthenticated, segments]);
 
-  // Don't render until ready
+  // Don't render until ready - keep background solid purple to prevent color flash
   if (!appReady) {
     return (
-      <View style={[styles.loading, { backgroundColor: Colors.cream }]} />
+      <View style={[styles.loading, { backgroundColor: '#6A3DE8' }]} />
     );
   }
 
@@ -97,7 +108,40 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? "light" : "dark"} />
+
+      {showSplash && (
+        <Animated.View
+          exiting={FadeOut.duration(500)}
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: '#6A3DE8',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 99999,
+            },
+          ]}
+        >
+          <Animated.Image
+            entering={FadeIn.delay(200).duration(800)}
+            source={require('../assets/images/spalsh.png')}
+            style={{ width: 260, height: 260, resizeMode: 'contain' }}
+          />
+          <Animated.Text
+            entering={FadeIn.delay(500).duration(800)}
+            style={{
+              marginTop: 24,
+              fontSize: 34,
+              fontFamily: 'Inter_700Bold',
+              color: '#FFFFFF',
+              letterSpacing: -0.5,
+            }}
+          >
+            Jadwalin
+          </Animated.Text>
+        </Animated.View>
+      )}
     </GestureHandlerRootView>
   );
 }

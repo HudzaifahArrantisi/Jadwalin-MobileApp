@@ -17,7 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTaskStore } from '@/store/taskStore';
-import { Colors, Spacing, FontSize, Radius, sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, Radius, sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT } from '@/constants/theme';
 
 interface OnboardingSlide {
   id: string;
@@ -61,6 +61,8 @@ const SLIDES: OnboardingSlide[] = [
 ];
 
 function SlideItem({ item, index, scrollX }: { item: OnboardingSlide; index: number; scrollX: SharedValue<number> }) {
+  const { Colors } = useAppTheme();
+  const slideStyles = React.useMemo(() => getSlideStyles(Colors), [Colors]);
   const iconFloat = useSharedValue(0);
 
   useEffect(() => {
@@ -115,7 +117,7 @@ function SlideItem({ item, index, scrollX }: { item: OnboardingSlide; index: num
   );
 }
 
-const slideStyles = StyleSheet.create({
+const getSlideStyles = (Colors: any) => StyleSheet.create({
   slide: {
     flex: 1,
     justifyContent: 'center',
@@ -161,6 +163,8 @@ const slideStyles = StyleSheet.create({
 });
 
 export default function OnboardingScreen() {
+  const { Colors } = useAppTheme();
+  const styles = React.useMemo(() => getStyles(Colors), [Colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const setHasSeenOnboarding = useTaskStore((s) => s.setHasSeenOnboarding);
@@ -265,7 +269,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.cream,

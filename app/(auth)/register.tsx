@@ -8,18 +8,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
-  FadeInDown, FadeIn,
+  FadeInDown,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { registerWithEmail } from '@/services/auth.service';
-import { Colors, Spacing, FontSize, sw, Shadow } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, sw, Shadow, Radius } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const PURPLE = '#7C3AED';
-const LIGHT_GREY = '#F3F4F6';
+const PURPLE = '#8B5CF6';
+const LIGHT_PURPLE = '#A78BFA';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { Colors } = useAppTheme();
+  
+  const styles = React.useMemo(() => getStyles(Colors), [Colors]);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -60,26 +65,36 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Decorative top wave */}
+      <View style={styles.topWaveDecor} />
+
+      {/* Elegant Back Button */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={[styles.backButton, { top: insets.top + sw(10) }]}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="arrow-back" size={sw(22)} color={Colors.white} />
+      </TouchableOpacity>
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           
-          <View style={styles.topHeader}>
-            <View style={styles.topHeaderBackground}>
-              <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
-                Sign Up
-              </Animated.Text>
-            </View>
-            <View style={styles.topHeaderCurve} />
+          <View style={[styles.headerSection, { paddingTop: insets.top + sw(60) }]}>
+            <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
+              Sign Up
+            </Animated.Text>
           </View>
 
           <View style={styles.formSection}>
+            
             <Animated.View entering={FadeInDown.delay(250).duration(400)} style={styles.inputWrapper}>
-              <View style={[styles.inputContainer, { borderWidth: 1, borderColor: PURPLE, backgroundColor: Colors.white }]}>
+              <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Email or mobile"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="Email address"
+                  placeholderTextColor="rgba(139, 92, 246, 0.5)"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -91,11 +106,11 @@ export default function RegisterScreen() {
 
             <Animated.View entering={FadeInDown.delay(350).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={sw(18)} color="#6B7280" style={styles.inputIcon} />
+                <Ionicons name="person-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="User name"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="Full name"
+                  placeholderTextColor="rgba(139, 92, 246, 0.5)"
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -105,26 +120,22 @@ export default function RegisterScreen() {
 
             <Animated.View entering={FadeInDown.delay(450).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={sw(18)} color="#6B7280" style={styles.inputIcon} />
+                <Ionicons name="lock-closed-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor="rgba(139, 92, 246, 0.5)"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={sw(20)} color="#6B7280" />
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={sw(20)} color={PURPLE} />
                 </TouchableOpacity>
               </View>
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.rememberForgotRow}>
-              <Text style={styles.rememberText}>Remember me</Text>
-            </Animated.View>
-
-            <Animated.View entering={FadeInDown.delay(550).duration(400)} style={{ marginTop: Spacing.xl }}>
+            <Animated.View entering={FadeInDown.delay(550).duration(400)} style={{ marginTop: Spacing.lg }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
                   onPressIn={() => { buttonScale.value = withSpring(0.97); }}
@@ -135,9 +146,9 @@ export default function RegisterScreen() {
                   style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
                 >
                   {isLoading ? (
-                    <ActivityIndicator color={Colors.white} size="small" />
+                    <ActivityIndicator color={PURPLE} size="small" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>SignUp</Text>
+                    <Text style={styles.primaryButtonText}>Sign Up</Text>
                   )}
                 </TouchableOpacity>
               </Animated.View>
@@ -149,65 +160,67 @@ export default function RegisterScreen() {
                 <Text style={styles.toggleLink}>Log IN</Text>
               </TouchableOpacity>
             </Animated.View>
-          </View>
 
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* Decorative bottom wave */}
       <View style={styles.bottomWaveDecor}>
-        <View style={styles.bottomWaveCurve} />
-        <View style={styles.bottomWaveBg} />
+        <View style={styles.bottomWaveCurveBg} />
+        <View style={styles.bottomWaveCurveFg} />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: PURPLE,
     position: 'relative',
+  },
+  topWaveDecor: {
+    position: 'absolute',
+    top: -SCREEN_WIDTH * 0.2,
+    right: -SCREEN_WIDTH * 0.2,
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
+    borderRadius: SCREEN_WIDTH * 0.4,
+    backgroundColor: LIGHT_PURPLE,
+    opacity: 0.5,
+  },
+  backButton: {
+    position: 'absolute',
+    left: Spacing.xl,
+    zIndex: 10,
+    width: sw(44),
+    height: sw(44),
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: sw(120), // Leave room for bottom wave
-  },
-  topHeader: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: sw(30),
-  },
-  topHeaderBackground: {
-    backgroundColor: PURPLE,
-    width: '100%',
-    height: sw(180),
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: sw(40),
-    borderBottomLeftRadius: SCREEN_WIDTH * 0.25,
-    borderBottomRightRadius: SCREEN_WIDTH * 0.25,
-    transform: [{ scaleX: 1.2 }],
+    paddingBottom: sw(80),
   },
-  topHeaderCurve: {
-    position: 'absolute',
-    bottom: -sw(40),
-    width: sw(100),
-    height: sw(100),
-    backgroundColor: Colors.white,
-    borderRadius: sw(50),
+  headerSection: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: sw(20),
   },
   headerTitle: {
-    fontSize: sw(42),
+    fontSize: sw(38),
     fontWeight: 'bold',
     color: Colors.white,
-    transform: [{ scaleX: 0.83 }], // counteract scaleX of parent
+    letterSpacing: 1,
   },
   formSection: {
     paddingHorizontal: Spacing.xl,
     width: '100%',
     maxWidth: 500,
     alignSelf: 'center',
-    marginTop: Spacing.xl,
   },
   inputWrapper: {
     marginBottom: Spacing.lg,
@@ -218,7 +231,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: Spacing.lg,
     height: sw(56),
-    backgroundColor: LIGHT_GREY,
+    backgroundColor: Colors.white,
+    ...Shadow.sm,
   },
   inputIcon: {
     marginRight: Spacing.md,
@@ -227,29 +241,21 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FontSize.md,
     height: '100%',
-    color: Colors.textPrimary,
-  },
-  rememberForgotRow: {
-    alignItems: 'center',
-    marginTop: -Spacing.xs,
-  },
-  rememberText: {
-    color: Colors.textPrimary,
-    fontSize: FontSize.sm,
-    fontWeight: 'bold',
+    color: PURPLE,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     height: sw(56),
-    backgroundColor: PURPLE,
+    backgroundColor: Colors.white,
     borderRadius: 999,
     ...Shadow.md,
   },
   primaryButtonText: {
-    color: Colors.white,
+    color: PURPLE,
     fontSize: FontSize.lg,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   footerRow: {
     marginTop: sw(30),
@@ -259,36 +265,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   toggleText: {
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
     fontSize: FontSize.md,
   },
   toggleLink: {
-    color: Colors.textPrimary,
+    color: Colors.white,
     fontSize: FontSize.md,
     fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
   bottomWaveDecor: {
     position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    height: sw(100),
+    bottom: -sw(60),
+    width: SCREEN_WIDTH,
+    height: sw(150),
+    zIndex: -1,
+    alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  bottomWaveBg: {
-    backgroundColor: PURPLE,
-    height: sw(80),
-    borderTopLeftRadius: SCREEN_WIDTH * 0.25,
-    borderTopRightRadius: SCREEN_WIDTH * 0.25,
-    transform: [{ scaleX: 1.2 }],
-  },
-  bottomWaveCurve: {
+  bottomWaveCurveBg: {
     position: 'absolute',
-    bottom: sw(40),
-    alignSelf: 'center',
-    width: sw(120),
-    height: sw(120),
+    width: SCREEN_WIDTH * 1.5,
+    height: sw(180),
+    backgroundColor: '#4C1D95',
+    borderTopLeftRadius: SCREEN_WIDTH,
+    borderTopRightRadius: SCREEN_WIDTH,
+    transform: [{ scaleX: 1.2 }],
+    bottom: sw(20),
+  },
+  bottomWaveCurveFg: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 1.5,
+    height: sw(150),
     backgroundColor: Colors.white,
-    borderRadius: sw(60),
-    zIndex: 1,
+    borderTopLeftRadius: SCREEN_WIDTH,
+    borderTopRightRadius: SCREEN_WIDTH,
+    transform: [{ scaleX: 1.2 }, { translateX: SCREEN_WIDTH * 0.1 }],
+    bottom: -sw(50),
   },
 });

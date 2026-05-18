@@ -17,3 +17,4 @@ android/
 GoogleService-Info.plist
 google-services.json
 Production.md
+*.apk

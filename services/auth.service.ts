@@ -14,7 +14,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile } from '@/types/task.types';
 
@@ -35,7 +35,7 @@ function mapFirebaseUser(user: User): UserProfile {
 async function saveUserProfile(user: User, extraData?: { name?: string }): Promise<void> {
   const userRef = doc(db, 'users', user.uid);
   const snapshot = await getDoc(userRef);
-
+  
   const displayName = extraData?.name || user.displayName || 'Pengguna';
 
   if (!snapshot.exists()) {
@@ -46,12 +46,13 @@ async function saveUserProfile(user: User, extraData?: { name?: string }): Promi
       createdAt: serverTimestamp(),
     });
   } else {
-    // Update photo and name if changed
+    const currentData = snapshot.data();
+    // Update name if needed, but preserve existing photoURL in Firestore if already set
     await setDoc(
       userRef,
       {
-        name: displayName,
-        photoURL: user.photoURL || snapshot.data().photoURL,
+        name: currentData.name || displayName,
+        photoURL: currentData.photoURL || user.photoURL || null,
       },
       { merge: true }
     );
@@ -112,11 +113,17 @@ export async function resetPassword(email: string): Promise<void> {
 export function onAuthChanged(
   callback: (user: UserProfile | null) => void
 ): () => void {
-  return onAuthStateChanged(auth, async (firebaseUser) => {
+  let unsubscribeSnapshot: (() => void) | null = null;
+
+  const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
     if (firebaseUser) {
-      try {
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        const snapshot = await getDoc(userRef);
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+
+      unsubscribeSnapshot = onSnapshot(userRef, async (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           callback({
@@ -129,17 +136,31 @@ export function onAuthChanged(
             address: data.address || undefined,
           });
         } else {
-          // Document doesn't exist yet, save and fallback
-          await saveUserProfile(firebaseUser);
-          callback(mapFirebaseUser(firebaseUser));
+          try {
+            await saveUserProfile(firebaseUser);
+            callback(mapFirebaseUser(firebaseUser));
+          } catch (error) {
+            callback(mapFirebaseUser(firebaseUser));
+          }
         }
-      } catch (error) {
+      }, (error) => {
         callback(mapFirebaseUser(firebaseUser));
-      }
+      });
     } else {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
       callback(null);
     }
   });
+
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+    }
+  };
 }
 
 /** Get current user */

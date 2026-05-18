@@ -4,6 +4,8 @@
 // ============================================
 
 import { Dimensions, PixelRatio } from 'react-native';
+import { useMemo } from 'react';
+import { useTaskStore } from '@/store/taskStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -30,13 +32,13 @@ export const normalize = (size: number) => {
 
 // ─── Color Palette (Purple/White/Black/Grey Theme) ───
 
-export const Colors = {
+export const LightColors = {
   // Primary backgrounds
   cream: '#FFFFFF',            // Main page background
   beige: '#F3F4F6',            // Header background / Light grey
   beigeDark: '#E5E7EB',        // Elevated Surface
   brown: '#6B7280',            // Muted Gray (Secondary text)
-  brownDark: '#7C3AED',        // Vivid Purple (Primary accent)
+  brownDark: '#8B5CF6',        // Vivid Purple (Primary accent)
   brownLight: '#F9FAFB',       // Card Surface
 
   // Activity card section
@@ -81,15 +83,15 @@ export const Colors = {
 
   // Tab bar
   tabBarBg: '#FFFFFF',
-  tabBarActive: '#7C3AED',
+  tabBarActive: '#8B5CF6',
   tabBarInactive: '#9CA3AF',
 
   // Calendar
   calendarHeader: '#FFFFFF',
-  calendarSelected: '#7C3AED',
+  calendarSelected: '#8B5CF6',
   calendarToday: '#F3F4F6',
-  calendarDot: '#7C3AED',
-  calendarPastDay: '#7C3AED',
+  calendarDot: '#8B5CF6',
+  calendarPastDay: '#8B5CF6',
 
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.4)',
@@ -98,6 +100,89 @@ export const Colors = {
   profileBg: '#F3F4F6',
   profileFormBg: '#FFFFFF',
 } as const;
+
+export const DarkColors = {
+  // Primary backgrounds
+  cream: '#121212',            // Main page background
+  beige: '#1E1E1E',            // Header background / Light grey
+  beigeDark: '#2C2C2C',        // Elevated Surface
+  brown: '#9CA3AF',            // Muted Gray (Secondary text)
+  brownDark: '#8B5CF6',        // Vivid Purple (Primary accent)
+  brownLight: '#18181B',       // Card Surface
+
+  // Activity card section
+  dailyCardBg: '#1E1E1E',
+  dailyCardBorder: '#2C2C2C',
+
+  // Colorful task card palette
+  taskPurple: '#C084FC',
+  taskBlue: '#7DD3FC',
+  taskGreen: '#4ADE80',
+  taskRed: '#F87171',
+  taskPink: '#F472B6',
+  taskOrange: '#FB923C',
+  taskTeal: '#2DD4BF',
+  taskYellow: '#FDE047',
+
+  // Pastel colors for lists/notes (darker versions)
+  pastelGreen: '#064E3B',
+  pastelGreenDark: '#065F46',
+  pastelRose: '#831843',
+  pastelBlue: '#1E3A8A',
+
+  // Status colors
+  checkGreen: '#34D399',
+  success: '#34D399',
+  warning: '#FBBF24',
+  danger: '#F87171',
+  info: '#60A5FA',
+
+  // Basic colors
+  white: '#FFFFFF',
+  black: '#000000',
+  textPrimary: '#F9FAFB',      // Near White
+  textSecondary: '#D1D5DB',    // Light Gray
+  textMuted: '#9CA3AF',        // Dim Gray
+  textLight: '#FFFFFF',
+
+  // Inputs & borders
+  inputBg: '#2C2C2C',
+  inputBorder: '#3F3F46',
+  borderLight: '#3F3F46',
+
+  // Tab bar
+  tabBarBg: '#121212',
+  tabBarActive: '#A78BFA',
+  tabBarInactive: '#6B7280',
+
+  // Calendar
+  calendarHeader: '#121212',
+  calendarSelected: '#8B5CF6',
+  calendarToday: '#1E1E1E',
+  calendarDot: '#A78BFA',
+  calendarPastDay: '#A78BFA',
+
+  // Overlay
+  overlay: 'rgba(0, 0, 0, 0.7)',
+
+  // Profile section
+  profileBg: '#121212',
+  profileFormBg: '#1E1E1E',
+} as const;
+
+export type ColorsType = typeof LightColors;
+
+export function useAppTheme() {
+  const themeMode = useTaskStore((s) => s.themeMode);
+  const activeColors = useMemo(() => (themeMode === 'dark' ? DarkColors : LightColors), [themeMode]);
+  return {
+    Colors: activeColors,
+    isDark: themeMode === 'dark',
+  };
+}
+
+// Default fallback export
+export const Colors = LightColors;
 
 // ─── Task Card Color Palette ───
 // Rotating colors assigned to tasks for visual variety

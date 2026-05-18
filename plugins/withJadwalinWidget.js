@@ -197,6 +197,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONObject
@@ -204,25 +206,33 @@ import ${PACKAGE}.R
 
 class JadwalinWidgetProvider : AppWidgetProvider() {
 
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-        for (appWidgetId in appWidgetIds) {
-            updateWidget(context, appWidgetManager, appWidgetId)
-        }
-    }
+    companion object {
+        private const val TAG = "JadwalinWidget"
 
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        if (intent.action == "com.candalena.JadwalinApp.WIDGET_UPDATE") {
+        /**
+         * Refreshes ALL widget instances: rebuilds RemoteViews and
+         * forces the ListView adapter to re-fetch data.
+         */
+        fun refreshAllWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(ComponentName(context, JadwalinWidgetProvider::class.java))
+            val ids = manager.getAppWidgetIds(
+                ComponentName(context, JadwalinWidgetProvider::class.java)
+            )
+            if (ids.isEmpty()) {
+                Log.d(TAG, "No widget instances found, skipping refresh")
+                return
+            }
+
+            // Step 1: Rebuild the full RemoteViews for each widget
             for (id in ids) {
                 updateWidget(context, manager, id)
             }
-            manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list)
-        }
-    }
 
-    companion object {
+            // Step 2: Force ListView to call onDataSetChanged() in the factory
+            manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list)
+            Log.d(TAG, "Refreshed " + ids.size + " widget(s)")
+        }
+
         fun updateWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
@@ -246,9 +256,15 @@ class JadwalinWidgetProvider : AppWidgetProvider() {
                         views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
                     }
 
-                    val intent = Intent(context, WidgetRemoteViewsService::class.java)
+                    // Use a unique URI per widget ID so Android doesn't cache the
+                    // RemoteViewsFactory across different data payloads.
+                    val intent = Intent(context, WidgetRemoteViewsService::class.java).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        setData(Uri.parse(toUri(Intent.URI_INTENT_SCHEME)))
+                    }
                     views.setRemoteAdapter(R.id.widget_list, intent)
                 } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing widget data", e)
                     views.setViewVisibility(R.id.widget_list, View.GONE)
                     views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
                 }
@@ -260,6 +276,23 @@ class JadwalinWidgetProvider : AppWidgetProvider() {
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }
+
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        Log.d(TAG, "onUpdate called for " + appWidgetIds.size + " widget(s)")
+        for (appWidgetId in appWidgetIds) {
+            updateWidget(context, appWidgetManager, appWidgetId)
+        }
+        // Also tell the ListView to re-fetch from SharedPreferences
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.widget_list)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == "com.candalena.JadwalinApp.WIDGET_UPDATE") {
+            Log.d(TAG, "WIDGET_UPDATE broadcast received")
+            refreshAllWidgets(context)
+        }
+    }
 }`);
 
     // WidgetRemoteViewsService.kt
@@ -268,9 +301,9 @@ class JadwalinWidgetProvider : AppWidgetProvider() {
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
-import org.json.JSONArray
 import org.json.JSONObject
 import ${PACKAGE}.R
 
@@ -282,23 +315,49 @@ class WidgetRemoteViewsService : RemoteViewsService() {
 
 class WidgetRemoteViewsFactory(private val context: Context) : RemoteViewsService.RemoteViewsFactory {
 
+    companion object {
+        private const val TAG = "WidgetFactory"
+    }
+
     private var tasks: MutableList<JSONObject> = mutableListOf()
 
-    override fun onCreate() { loadData() }
+    override fun onCreate() {
+        Log.d(TAG, "onCreate — loading initial data")
+        loadData()
+    }
 
-    override fun onDataSetChanged() { loadData() }
+    /**
+     * Called by the system when notifyAppWidgetViewDataChanged() is invoked.
+     * This runs on a binder thread (NOT the main thread), so it's safe to
+     * do synchronous SharedPreferences reads here.
+     */
+    override fun onDataSetChanged() {
+        Log.d(TAG, "onDataSetChanged — reloading data from SharedPreferences")
+        loadData()
+    }
 
     private fun loadData() {
         tasks.clear()
         val prefs = context.getSharedPreferences("jadwalin_prefs", Context.MODE_PRIVATE)
-        val json = prefs.getString("jadwalin_widget_data", null) ?: return
+        val json = prefs.getString("jadwalin_widget_data", null)
+        if (json == null) {
+            Log.d(TAG, "No widget data in SharedPreferences")
+            return
+        }
         try {
             val data = JSONObject(json)
-            val arr = data.optJSONArray("tasks") ?: return
+            val arr = data.optJSONArray("tasks")
+            if (arr == null) {
+                Log.d(TAG, "No tasks array in widget data")
+                return
+            }
             for (i in 0 until arr.length()) {
                 tasks.add(arr.getJSONObject(i))
             }
-        } catch (_: Exception) {}
+            Log.d(TAG, "Loaded " + tasks.size + " tasks")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing widget data", e)
+        }
     }
 
     override fun getCount(): Int = tasks.size
@@ -325,10 +384,8 @@ class WidgetRemoteViewsFactory(private val context: Context) : RemoteViewsServic
     writeFile(path.join(widgetDir, 'JadwalinWidgetModule.kt'),
 `package ${PACKAGE}.widget
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
+import android.util.Log
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -336,35 +393,36 @@ import com.facebook.react.bridge.ReactMethod
 class JadwalinWidgetModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
+    companion object {
+        private const val TAG = "JadwalinWidgetModule"
+    }
+
     override fun getName(): String = "JadwalinWidgetModule"
 
     @ReactMethod
     fun updateWidgetData(json: String) {
         val context = reactApplicationContext
+
+        // 1. Write to SharedPreferences SYNCHRONOUSLY using commit().
+        //    apply() is async — the widget would read stale data.
         val prefs = context.getSharedPreferences("jadwalin_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putString("jadwalin_widget_data", json).apply()
+        val success = prefs.edit().putString("jadwalin_widget_data", json).commit()
+        Log.d(TAG, "SharedPreferences commit success=" + success)
 
-        // Trigger widget refresh
-        val intent = Intent("com.candalena.JadwalinApp.WIDGET_UPDATE")
-        intent.setPackage(context.packageName)
-        context.sendBroadcast(intent)
-
-        val manager = AppWidgetManager.getInstance(context)
-        val ids = manager.getAppWidgetIds(
-            ComponentName(context, JadwalinWidgetProvider::class.java)
-        )
-        manager.notifyAppWidgetViewDataChanged(ids, com.candalena.JadwalinApp.R.id.widget_list)
+        // 2. Directly refresh all widget instances.
+        //    No broadcast needed — we are in the same process and can
+        //    call the provider's static helper directly.
+        JadwalinWidgetProvider.refreshAllWidgets(context)
     }
 
     @ReactMethod
     fun clearWidgetData() {
         val context = reactApplicationContext
         val prefs = context.getSharedPreferences("jadwalin_prefs", Context.MODE_PRIVATE)
-        prefs.edit().remove("jadwalin_widget_data").apply()
+        prefs.edit().remove("jadwalin_widget_data").commit()
+        Log.d(TAG, "Widget data cleared")
 
-        val intent = Intent("com.candalena.JadwalinApp.WIDGET_UPDATE")
-        intent.setPackage(context.packageName)
-        context.sendBroadcast(intent)
+        JadwalinWidgetProvider.refreshAllWidgets(context)
     }
 }`);
 
@@ -466,57 +524,12 @@ function withWidgetManifest(config) {
   });
 }
 
-// ── 5. Force minSdkVersion ──
-function withMinSdkInAppGradle(config) {
-  return withAppBuildGradle(config, (config) => {
-    let gradle = config.modResults.contents;
-    gradle = gradle.replace(/minSdkVersion\s+rootProject\.ext\.minSdkVersion/g, 'minSdkVersion 24');
-    gradle = gradle.replace(/minSdkVersion\s+\d+/g, 'minSdkVersion 24');
-    config.modResults.contents = gradle;
-    return config;
-  });
-}
-
-// ── 6. Force minSdk in root build.gradle ──
-function withMinSdkInRootGradle(config) {
-  return withProjectBuildGradle(config, (config) => {
-    let gradle = config.modResults.contents;
-    const block = `
-subprojects {
-    plugins.withType(com.android.build.gradle.LibraryPlugin) {
-        android {
-            if (defaultConfig.minSdkVersion == null || defaultConfig.minSdkVersion.apiLevel < 24) {
-                defaultConfig.minSdkVersion 24
-            }
-            defaultConfig.externalNativeBuild { cmake { arguments "-DANDROID_PLATFORM=android-24" } }
-        }
-    }
-    plugins.withType(com.android.build.gradle.AppPlugin) {
-        android {
-            if (defaultConfig.minSdkVersion == null || defaultConfig.minSdkVersion.apiLevel < 24) {
-                defaultConfig.minSdkVersion 24
-            }
-        }
-    }
-}
-`;
-    gradle = gradle.replace(/\/\/ ── Jadwalin: Force minSdkVersion[\s\S]*?\n}\n/g, '');
-    if (!gradle.includes('Jadwalin: Force')) {
-      gradle = gradle.trimEnd() + '\n// ── Jadwalin: Force minSdkVersion 24 ──' + block;
-    }
-    config.modResults.contents = gradle;
-    return config;
-  });
-}
-
 // ── Main plugin ──
 function withJadwalinWidget(config) {
   config = withWidgetXmlFile(config);
   config = withKotlinFiles(config);
   config = withMainApplicationPatch(config);
   config = withWidgetManifest(config);
-  config = withMinSdkInAppGradle(config);
-  config = withMinSdkInRootGradle(config);
   return config;
 }
 

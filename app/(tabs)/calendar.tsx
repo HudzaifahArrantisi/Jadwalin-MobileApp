@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, Platform, StyleSheet, FlatList } from 'react-native';
-import { Colors, Spacing, FontSize, Radius, Shadow, sw, FontWeight } from '../../constants/theme';
+import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, FontWeight } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTasks } from '../../hooks/useTasks';
@@ -16,11 +16,13 @@ import Animated, {
   withRepeat, 
   withTiming, 
   withSequence,
-  interpolate
+  interpolate,
+  FadeIn
 } from 'react-native-reanimated';
 
 // ─── Today Pulse Indicator ───
 function TodayIndicator() {
+  const { Colors } = useAppTheme();
   const pulse = useSharedValue(0);
 
   React.useEffect(() => {
@@ -71,6 +73,8 @@ const AVAILABLE_ICONS = [
 ];
 
 export default function CalendarScreen() {
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors), [Colors]);
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAddTask, setShowAddTask] = useState(false);
@@ -205,6 +209,7 @@ const handleAddTask = async () => {
         {/* Calendar Grid */}
         <View style={styles.calendarCard}>
           <Calendar
+            key={isDark ? 'dark' : 'light'}
             current={selectedDateString}
             onDayPress={(day: any) => {
               setSelectedDate(new Date(day.timestamp));
@@ -218,40 +223,59 @@ const handleAddTask = async () => {
               const isToday = date.dateString === format(new Date(), 'yyyy-MM-dd');
 
               return (
-                <TouchableOpacity 
-                  onPress={() => setSelectedDate(new Date(date.timestamp))}
-                  style={[
-                    styles.dayContainer,
-                    isPast && !isSelected && styles.dayContainerPast,
-                    isSelected && styles.dayContainerSelected
-                  ]}
-                >
-                  {isToday && !isSelected && <TodayIndicator />}
-                  <Text style={[
-                    styles.dayText,
-                    state === 'disabled' && styles.dayTextDisabled,
-                    isPast && !isSelected && { color: Colors.white, fontWeight: '600' },
-                    isToday && !isSelected && { color: Colors.white, fontWeight: '700' },
-                    isSelected && styles.dayTextSelected
-                  ]}>
-                    {date.day}
-                  </Text>
-                  
-                  {icons.length > 0 ? (
-                    <View style={styles.dayIconsRow}>
-                      {icons.map((iconName: string, idx: number) => (
-                        <Ionicons 
-                          key={idx} 
-                          name={iconName as any} 
-                          size={10} 
-                          color={isSelected ? Colors.white : isPast ? Colors.white : Colors.brownDark} 
-                        />
-                      ))}
-                    </View>
-                  ) : (
-                    <View style={styles.dayIconsPlaceholder} />
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  {/* Connecting Line */}
+                  {isPast && (
+                    <Animated.View 
+                      entering={FadeIn.delay(200).duration(500)}
+                      style={{
+                        position: 'absolute',
+                        top: sw(15), // center of the circle
+                        left: '50%',
+                        width: '100%', // stretches to the next day
+                        height: 3,
+                        backgroundColor: Colors.brownDark,
+                        zIndex: 0,
+                      }} 
+                    />
                   )}
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => setSelectedDate(new Date(date.timestamp))}
+                    style={[styles.dayContainer, { zIndex: 1 }]}
+                  >
+                    {isToday && !isSelected && <TodayIndicator />}
+                    <View style={[
+                      styles.dateCircle,
+                      isPast && !isSelected && styles.dateCirclePast,
+                      isSelected && styles.dateCircleSelected
+                    ]}>
+                      <Text style={[
+                        styles.dayText,
+                        state === 'disabled' && styles.dayTextDisabled,
+                        isPast && !isSelected && { color: Colors.white, fontWeight: '600' },
+                        isToday && !isSelected && { color: Colors.white, fontWeight: '700' },
+                        isSelected && styles.dayTextSelected
+                      ]}>
+                        {date.day}
+                      </Text>
+                    </View>
+                    
+                    {icons.length > 0 ? (
+                      <View style={styles.dayIconsRow}>
+                        {icons.map((iconName: string, idx: number) => (
+                          <Ionicons 
+                            key={idx} 
+                            name={iconName as any} 
+                            size={10} 
+                            color={Colors.brownDark} 
+                          />
+                        ))}
+                      </View>
+                    ) : (
+                      <View style={styles.dayIconsPlaceholder} />
+                    )}
+                  </TouchableOpacity>
+                </View>
               );
             }}
             theme={{
@@ -481,7 +505,7 @@ const handleAddTask = async () => {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.cream },
   topHeader: {
     flexDirection: 'row',
@@ -546,14 +570,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     gap: sw(6), 
-    backgroundColor: Colors.white, 
+    backgroundColor: Colors.inputBg, 
     alignSelf: 'flex-start', 
     paddingHorizontal: sw(12), 
     paddingVertical: sw(6), 
     borderRadius: Radius.full,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.beigeDark,
+    borderColor: Colors.inputBorder,
   },
   formDateBadgeText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary },
   nameIconRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.sm },
@@ -567,7 +591,7 @@ const styles = StyleSheet.create({
   datePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(14) },
   datePickerText: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '600' },
   typeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
-  typeBtn: { flex: 1, paddingVertical: sw(10), alignItems: 'center', backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder },
+  typeBtn: { flex: 1, paddingVertical: sw(10), alignItems: 'center', backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder },
   typeBtnActive: { backgroundColor: Colors.brownDark, borderColor: Colors.brownDark },
   typeBtnText: { fontSize: FontSize.sm, color: Colors.textPrimary, fontWeight: '600' },
   typeBtnTextActive: { color: Colors.white },
@@ -604,10 +628,10 @@ const styles = StyleSheet.create({
   
   // Icon Picker Styles
   iconModalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center' },
-  iconModalContainer: { backgroundColor: Colors.white, borderRadius: Radius.xl, width: '85%', maxHeight: '65%', padding: Spacing.lg, ...Shadow.lg },
+  iconModalContainer: { backgroundColor: Colors.beige, borderRadius: Radius.xl, width: '85%', maxHeight: '65%', padding: Spacing.lg, ...Shadow.lg },
   iconModalTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.brownDark, marginBottom: Spacing.md, textAlign: 'center' },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm },
-  iconCell: { width: sw(50), height: sw(50), borderRadius: Radius.lg, backgroundColor: Colors.beige, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.inputBorder },
+  iconCell: { width: sw(50), height: sw(50), borderRadius: Radius.lg, backgroundColor: Colors.inputBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.inputBorder },
   iconCellSelected: { backgroundColor: Colors.brownDark, borderColor: Colors.brownDark },
 
   // Custom Day Component Styles
@@ -615,16 +639,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: sw(38),
-    height: sw(46),
-    borderRadius: Radius.full,
+    paddingTop: sw(2),
   },
-  dayContainerPast: {
+  dateCircle: {
+    width: sw(28),
+    height: sw(28),
+    borderRadius: sw(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateCirclePast: {
     backgroundColor: Colors.brownDark,
   },
-  dayContainerSelected: {
+  dateCircleSelected: {
     backgroundColor: Colors.brownDark,
     borderWidth: 2,
     borderColor: Colors.white,
+    ...Shadow.glow,
   },
   dayText: {
     fontSize: FontSize.md,

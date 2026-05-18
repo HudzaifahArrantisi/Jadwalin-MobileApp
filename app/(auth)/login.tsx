@@ -13,7 +13,7 @@ import Animated, {
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { signInWithEmail, signInWithGoogle } from '@/services/auth.service';
-import { Colors, Spacing, FontSize, Radius, sw, Shadow } from '@/constants/theme';
+import { useAppTheme, Colors, Spacing, FontSize, Radius, sw, Shadow } from '@/constants/theme';
 import { Env } from '@/constants/env';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -21,11 +21,16 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Required for web-based auth redirects to complete properly
 WebBrowser.maybeCompleteAuthSession();
 
-const PURPLE = '#7C3AED';
-const LIGHT_PURPLE = '#8B5CF6';
+const PURPLE = '#8B5CF6';
+const LIGHT_PURPLE = '#A78BFA';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { Colors, isDark } = useAppTheme();
+  
+  const PURPLE_DYNAMIC = Colors.brownDark;
+  const LIGHT_PURPLE_DYNAMIC = isDark ? Colors.taskPurple : '#A78BFA';
+  const styles = React.useMemo(() => getStyles(Colors, PURPLE_DYNAMIC, LIGHT_PURPLE_DYNAMIC), [Colors, isDark]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,9 +47,9 @@ export default function LoginScreen() {
   const isAndroid = Platform.OS === 'android';
 
   const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: Env.GOOGLE_WEB_CLIENT_ID,
     webClientId: Env.GOOGLE_WEB_CLIENT_ID,
-    androidClientId: isAndroid ? Env.GOOGLE_ANDROID_CLIENT_ID : undefined,
-    iosClientId: isAndroid ? undefined : 'disabled',
+    redirectUri: 'https://auth.expo.io/@candalena/JadwalinApp',
   });
 
   useEffect(() => {
@@ -126,7 +131,7 @@ export default function LoginScreen() {
           <View style={styles.formSection}>
             <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
+                <Ionicons name="mail-outline" size={sw(18)} color={PURPLE_DYNAMIC} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="User name or email"
@@ -142,7 +147,7 @@ export default function LoginScreen() {
 
             <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.inputWrapper}>
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
+                <Ionicons name="lock-closed-outline" size={sw(18)} color={PURPLE_DYNAMIC} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
@@ -152,7 +157,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={sw(20)} color={PURPLE} />
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={sw(20)} color={PURPLE_DYNAMIC} />
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -175,7 +180,7 @@ export default function LoginScreen() {
                   style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
                 >
                   {isLoading ? (
-                    <ActivityIndicator color={PURPLE} size="small" />
+                    <ActivityIndicator color={PURPLE_DYNAMIC} size="small" />
                   ) : (
                     <Text style={styles.primaryButtonText}>Log In</Text>
                   )}
@@ -203,7 +208,7 @@ export default function LoginScreen() {
             
             <Animated.View entering={FadeInDown.delay(700).duration(400)} style={styles.footerRow}>
               <TouchableOpacity onPress={() => router.push('/(auth)/register')} style={styles.toggleRow}>
-                <Text style={styles.toggleText}>Don't have an account? </Text>
+                <Text style={styles.toggleText}>{"Don't have an account? "}</Text>
                 <Text style={styles.toggleLink}>Sign Up</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -222,7 +227,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any, PURPLE: string, LIGHT_PURPLE: string) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: PURPLE,

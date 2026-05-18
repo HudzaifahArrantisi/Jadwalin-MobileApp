@@ -141,6 +141,8 @@ export interface NoteList {
   title: string;
   emoji: string;
   color: string;
+  type?: 'list' | 'text';
+  content?: string;
   items: NoteItem[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -151,6 +153,8 @@ export interface CreateNoteListInput {
   title: string;
   emoji: string;
   color: string;
+  type?: 'list' | 'text';
+  content?: string;
   items: Omit<NoteItem, 'id'>[];
 }
 
@@ -159,6 +163,8 @@ export interface UpdateNoteListInput {
   title?: string;
   emoji?: string;
   color?: string;
+  type?: 'list' | 'text';
+  content?: string;
   items?: NoteItem[];
 }
 

@@ -24,7 +24,7 @@ module.exports = {
   },
   web: {
     output: "static",
-    favicon: "./assets/images/favicon.png",
+    favicon: "./assets/images/icon.png",
   },
   plugins: [
     "expo-router",
@@ -32,12 +32,12 @@ module.exports = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
+        image: "./assets/images/spalsh.png",
+        imageWidth: 260,
         resizeMode: "contain",
-        backgroundColor: "#000000",
+        backgroundColor: "#6A3DE8",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#6A3DE8",
         },
       },
     ],

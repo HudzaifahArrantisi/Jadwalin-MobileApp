@@ -189,17 +189,24 @@ export async function syncWidgetData(tasks: Task[]): Promise<void> {
     // 1. Write to AsyncStorage (React Native side)
     await AsyncStorage.setItem(WIDGET_STORAGE_KEY, json);
 
-    // 2. Write to native SharedPreferences (Android) and refresh widget
+    // 2. Write to native SharedPreferences (Android) and refresh widget.
+    //    The native module uses commit() (synchronous write) and then
+    //    directly calls updateAppWidget + notifyAppWidgetViewDataChanged,
+    //    so the widget sees the new data immediately.
     if (Platform.OS === 'android') {
       try {
         const { JadwalinWidgetModule } = NativeModules;
         if (JadwalinWidgetModule?.updateWidgetData) {
-          JadwalinWidgetModule.updateWidgetData(json);
-          console.log(`[Widget] Synced ${widgetData.tasks.length} tasks for widget (week: ${widgetData.weekLabel})`);
+          await Promise.resolve(JadwalinWidgetModule.updateWidgetData(json));
+          console.log(
+            `[Widget] ✅ Synced ${widgetData.tasks.length} tasks for widget (week: ${widgetData.weekLabel})`
+          );
+        } else {
+          console.log('[Widget] JadwalinWidgetModule.updateWidgetData not found');
         }
       } catch (e) {
         // Native module not yet available (e.g. running in Expo Go)
-        console.log('[Widget] Native module not available, skipping native sync.');
+        console.log('[Widget] Native module not available, skipping native sync:', e);
       }
     }
   } catch (error) {

@@ -8,18 +8,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring,
-  FadeInDown, FadeIn,
+  FadeInDown,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { resetPassword } from '@/services/auth.service';
-import { Colors, Spacing, FontSize, sw, Shadow, Radius } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, sw, Shadow, Radius } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const PURPLE = '#7C3AED';
-const LIGHT_GREY = '#484848ff';
+const PURPLE = '#8B5CF6';
+const LIGHT_PURPLE = '#A78BFA';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { Colors } = useAppTheme();
+  
+  const styles = React.useMemo(() => getStyles(Colors), [Colors]);
 
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,41 +59,46 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Decorative top wave */}
+      <View style={styles.topWaveDecor} />
+
+      {/* Elegant Back Button */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={[styles.backButton, { top: insets.top + sw(10) }]}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="arrow-back" size={sw(22)} color={Colors.white} />
+      </TouchableOpacity>
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           
-          <View style={styles.topHeader}>
-            <View style={styles.topHeaderBackground}>
-              <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
-                Forgot
-              </Animated.Text>
-            </View>
-            <View style={styles.topHeaderCurve} />
+          <View style={[styles.headerSection, { paddingTop: insets.top + sw(60) }]}>
+            <Animated.Text entering={FadeInDown.delay(200).duration(500)} style={styles.headerTitle}>
+              Forgot Password
+            </Animated.Text>
           </View>
 
           <View style={styles.formSection}>
-            <Animated.View entering={FadeIn.delay(100).duration(300)}>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
-                <Ionicons name="arrow-back" size={sw(22)} color={PURPLE} />
-              </TouchableOpacity>
-            </Animated.View>
-
-            <Text style={styles.formSubtitle}>Masukkan email untuk mereset kata sandi.</Text>
+            <Animated.Text entering={FadeInDown.delay(250).duration(400)} style={styles.formSubtitle}>
+              Masukkan email terdaftar Anda. Kami akan mengirimkan tautan untuk mereset kata sandi.
+            </Animated.Text>
 
             {isSent && (
               <Animated.View entering={FadeInDown.duration(400)} style={styles.successBanner}>
-                <Ionicons name="checkmark-circle" size={sw(22)} color={Colors.checkGreen} />
-                <Text style={styles.successText}>Tautan reset telah dikirim!</Text>
+                <Ionicons name="checkmark-circle" size={sw(22)} color={Colors.white} />
+                <Text style={styles.successText}>Tautan reset telah dikirim ke email Anda!</Text>
               </Animated.View>
             )}
 
             <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.inputWrapper}>
-              <View style={[styles.inputContainer, { borderWidth: 1, borderColor: PURPLE, backgroundColor: Colors.white }]}>
+              <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={sw(18)} color={PURPLE} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Email or mobile"
-                  placeholderTextColor="#9CA3AF"
+                  placeholder="Email address"
+                  placeholderTextColor="rgba(139, 92, 246, 0.5)"
                   value={email}
                   onChangeText={(text) => { setEmail(text); setIsSent(false); }}
                   keyboardType="email-address"
@@ -98,7 +108,7 @@ export default function ForgotPasswordScreen() {
               </View>
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: Spacing.xl }}>
+            <Animated.View entering={FadeInDown.delay(400).duration(400)} style={{ marginTop: Spacing.lg }}>
               <Animated.View style={btnAnim}>
                 <TouchableOpacity
                   onPressIn={() => { buttonScale.value = withSpring(0.97); }}
@@ -109,7 +119,7 @@ export default function ForgotPasswordScreen() {
                   style={[styles.primaryButton, { opacity: isLoading ? 0.7 : 1 }]}
                 >
                   {isLoading ? (
-                    <ActivityIndicator color={Colors.white} size="small" />
+                    <ActivityIndicator color={PURPLE} size="small" />
                   ) : (
                     <Text style={styles.primaryButtonText}>Send Link</Text>
                   )}
@@ -121,89 +131,84 @@ export default function ForgotPasswordScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* Decorative bottom wave */}
       <View style={styles.bottomWaveDecor}>
-        <View style={styles.bottomWaveCurve} />
-        <View style={styles.bottomWaveBg} />
+        <View style={styles.bottomWaveCurveBg} />
+        <View style={styles.bottomWaveCurveFg} />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: PURPLE,
     position: 'relative',
+  },
+  topWaveDecor: {
+    position: 'absolute',
+    top: -SCREEN_WIDTH * 0.2,
+    right: -SCREEN_WIDTH * 0.2,
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
+    borderRadius: SCREEN_WIDTH * 0.4,
+    backgroundColor: LIGHT_PURPLE,
+    opacity: 0.5,
+  },
+  backButton: {
+    position: 'absolute',
+    left: Spacing.xl,
+    zIndex: 10,
+    width: sw(44),
+    height: sw(44),
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: sw(120),
-  },
-  topHeader: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: sw(30),
-  },
-  topHeaderBackground: {
-    backgroundColor: PURPLE,
-    width: '100%',
-    height: sw(180),
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: sw(40),
-    borderBottomLeftRadius: SCREEN_WIDTH * 0.25,
-    borderBottomRightRadius: SCREEN_WIDTH * 0.25,
-    transform: [{ scaleX: 1.2 }],
+    paddingBottom: sw(80),
   },
-  topHeaderCurve: {
-    position: 'absolute',
-    bottom: -sw(40),
-    width: sw(100),
-    height: sw(100),
-    backgroundColor: Colors.white,
-    borderRadius: sw(50),
+  headerSection: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: sw(20),
   },
   headerTitle: {
-    fontSize: sw(42),
+    fontSize: sw(38),
     fontWeight: 'bold',
     color: Colors.white,
-    transform: [{ scaleX: 0.83 }],
+    letterSpacing: 1,
   },
   formSection: {
     paddingHorizontal: Spacing.xl,
     width: '100%',
     maxWidth: 500,
     alignSelf: 'center',
-    marginTop: Spacing.lg,
-  },
-  backButton: {
-    width: sw(44),
-    height: sw(44),
-    borderRadius: 22,
-    backgroundColor: LIGHT_GREY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
   },
   formSubtitle: {
     fontSize: FontSize.md,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.85)',
     marginBottom: Spacing.xl,
-    textAlign: 'center',
+    lineHeight: sw(22),
   },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     padding: Spacing.md,
     borderRadius: Radius.md,
     marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   successText: {
     flex: 1,
     fontSize: FontSize.sm,
-    color: Colors.checkGreen,
+    color: Colors.white,
     fontWeight: '600',
   },
   inputWrapper: {
@@ -215,7 +220,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: Spacing.lg,
     height: sw(56),
-    backgroundColor: LIGHT_GREY,
+    backgroundColor: Colors.white,
+    ...Shadow.sm,
   },
   inputIcon: {
     marginRight: Spacing.md,
@@ -224,43 +230,49 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FontSize.md,
     height: '100%',
-    color: Colors.textPrimary,
+    color: PURPLE,
   },
   primaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
     height: sw(56),
-    backgroundColor: PURPLE,
+    backgroundColor: Colors.white,
     borderRadius: 999,
     ...Shadow.md,
   },
   primaryButtonText: {
-    color: Colors.white,
+    color: PURPLE,
     fontSize: FontSize.lg,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   bottomWaveDecor: {
     position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    height: sw(100),
+    bottom: -sw(60),
+    width: SCREEN_WIDTH,
+    height: sw(150),
+    zIndex: -1,
+    alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  bottomWaveBg: {
-    backgroundColor: PURPLE,
-    height: sw(80),
-    borderTopLeftRadius: SCREEN_WIDTH * 0.25,
-    borderTopRightRadius: SCREEN_WIDTH * 0.25,
-    transform: [{ scaleX: 1.2 }],
-  },
-  bottomWaveCurve: {
+  bottomWaveCurveBg: {
     position: 'absolute',
-    bottom: sw(40),
-    alignSelf: 'center',
-    width: sw(120),
-    height: sw(120),
+    width: SCREEN_WIDTH * 1.5,
+    height: sw(180),
+    backgroundColor: '#4C1D95',
+    borderTopLeftRadius: SCREEN_WIDTH,
+    borderTopRightRadius: SCREEN_WIDTH,
+    transform: [{ scaleX: 1.2 }],
+    bottom: sw(20),
+  },
+  bottomWaveCurveFg: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 1.5,
+    height: sw(150),
     backgroundColor: Colors.white,
-    borderRadius: sw(60),
-    zIndex: 1,
+    borderTopLeftRadius: SCREEN_WIDTH,
+    borderTopRightRadius: SCREEN_WIDTH,
+    transform: [{ scaleX: 1.2 }, { translateX: SCREEN_WIDTH * 0.1 }],
+    bottom: -sw(50),
   },
 });

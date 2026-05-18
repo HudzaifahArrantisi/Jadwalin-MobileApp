@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, Image, Platform, KeyboardAvoidingView,
+  TextInput, Alert, Image, Platform, KeyboardAvoidingView, Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,12 +22,16 @@ import { updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskStore } from '@/store/taskStore';
-import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH } from '@/constants/theme';
 import InteractivePressable from '@/components/InteractivePressable';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
-  const { setUser } = useTaskStore();
+  const { setUser, themeMode, toggleTheme } = useTaskStore();
+  const tasks = useTaskStore(state => state.tasks);
+  const completedTasksCount = tasks.filter(t => t.status === 'completed').length;
+  const { Colors } = useAppTheme();
+  const styles = React.useMemo(() => getStyles(Colors), [Colors]);
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState(user?.name || '');
@@ -83,6 +87,7 @@ export default function ProfileScreen() {
         });
 
         setIsEditing(false);
+        setLocalPhotoUri(null);
         Alert.alert('Berhasil', 'Profil berhasil diperbarui');
       } catch (err: any) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -195,7 +200,9 @@ export default function ProfileScreen() {
           <Animated.View entering={FadeInDown.delay(200).duration(400).springify()} style={styles.formSection}>
             <View style={styles.formCard}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="person-outline" size={sw(20)} color={Colors.brownDark} />
+                <View style={styles.sectionIconWrap}>
+                  <Ionicons name="person-outline" size={sw(18)} color={Colors.white} />
+                </View>
                 <Text style={styles.sectionTitle}>Informasi Personal</Text>
               </View>
 
@@ -246,6 +253,54 @@ export default function ProfileScreen() {
             </View>
           </Animated.View>
 
+          {/* Statistics Section */}
+          <Animated.View entering={FadeInDown.delay(225).duration(400).springify()} style={styles.formSection}>
+            <View style={styles.formCard}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconWrap}>
+                  <Ionicons name="stats-chart-outline" size={sw(18)} color={Colors.white} />
+                </View>
+                <Text style={styles.sectionTitle}>Statistik & Histori</Text>
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextWrap}>
+                  <Text style={styles.settingLabel}>Jadwal Diselesaikan</Text>
+                  <Text style={styles.settingDesc}>Total jadwal yang telah sukses dilakukan</Text>
+                </View>
+                <View style={styles.statsBadge}>
+                  <Text style={styles.statsBadgeText}>{completedTasksCount}</Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Preferences Section */}
+          <Animated.View entering={FadeInDown.delay(250).duration(400).springify()} style={styles.formSection}>
+            <View style={styles.formCard}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconWrap}>
+                  <Ionicons name="settings-outline" size={sw(18)} color={Colors.white} />
+                </View>
+                <Text style={styles.sectionTitle}>Pengaturan Aplikasi</Text>
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextWrap}>
+                  <Text style={styles.settingLabel}>Tema Gelap</Text>
+                  <Text style={styles.settingDesc}>Aktifkan mode gelap (Dark Mode)</Text>
+                </View>
+                <Switch
+                  value={themeMode === 'dark'}
+                  onValueChange={toggleTheme}
+                  trackColor={{ false: Colors.inputBorder, true: Colors.brownDark }}
+                  thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : Colors.cream}
+                  ios_backgroundColor={Colors.inputBorder}
+                />
+              </View>
+            </View>
+          </Animated.View>
+
           {/* Logout Section */}
           <Animated.View entering={FadeInDown.delay(300).duration(400).springify()} style={styles.logoutSection}>
             <InteractivePressable style={styles.logoutBtn} onPress={handleLogout} hapticType={Haptics.ImpactFeedbackStyle.Medium}>
@@ -262,7 +317,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (Colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.cream },
   
   // Header styles
@@ -309,15 +364,23 @@ const styles = StyleSheet.create({
   profileEmail: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: '500' },
   
   // Form styles
-  formSection: { paddingHorizontal: Spacing.lg, zIndex: 1 },
+  formSection: { paddingHorizontal: Spacing.lg, zIndex: 1, marginBottom: Spacing.lg },
   formCard: { 
-    backgroundColor: Colors.white, borderRadius: Radius.xl, 
+    backgroundColor: Colors.profileFormBg || Colors.white, borderRadius: Radius.xxl, 
     padding: Spacing.lg, ...Shadow.md,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
   },
   sectionHeader: { 
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, 
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md, 
     borderBottomWidth: 1, borderBottomColor: Colors.inputBorder,
     paddingBottom: Spacing.md, marginBottom: Spacing.lg,
+  },
+  sectionIconWrap: {
+    width: sw(32), height: sw(32),
+    borderRadius: sw(12),
+    backgroundColor: Colors.brownDark,
+    alignItems: 'center', justifyContent: 'center',
+    ...Shadow.sm,
   },
   sectionTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
   fieldGroup: { marginBottom: Spacing.lg },
@@ -335,10 +398,33 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 1, backgroundColor: Colors.brownDark, borderRadius: Radius.lg, alignItems: 'center', paddingVertical: sw(12), ...Shadow.sm },
   saveBtnText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.white },
   
+  // Settings row
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.xs },
+  settingTextWrap: { flex: 1, paddingRight: Spacing.md },
+  settingLabel: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary, marginBottom: 2 },
+  settingDesc: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    marginTop: sw(2),
+  },
+  statsBadge: {
+    backgroundColor: Colors.brownDark,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: sw(6),
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsBadgeText: {
+    color: Colors.white,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+  },
+  
   // Logout styles
   logoutSection: { paddingHorizontal: Spacing.lg, marginTop: Spacing.xl },
   logoutBtn: { 
-    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.profileFormBg || Colors.white,
     borderRadius: Radius.xl, padding: Spacing.md, ...Shadow.sm,
   },
   logoutIconWrapper: { 

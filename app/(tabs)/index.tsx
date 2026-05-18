@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, RefreshControl, FlatList, Modal, Platform
+  Image, RefreshControl, FlatList, Modal, Platform, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { 
-  FadeInDown, FadeIn, FadeInRight, 
+  FadeInDown, FadeIn, FadeInRight, SlideInRight, SlideOutRight,
   Layout, useSharedValue, useAnimatedStyle, 
   withSpring, withTiming, runOnJS 
 } from 'react-native-reanimated';
@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
 import { Task } from '@/types/task.types';
 import { parseTaskDate } from '@/utils/date';
-import { Colors, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH, getTaskCardColor, TASK_CARD_COLORS } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH, getTaskCardColor, TASK_CARD_COLORS } from '@/constants/theme';
 import InteractivePressable from '@/components/InteractivePressable';
 
 const formatLocalDate = (d: Date) => {
@@ -93,60 +93,90 @@ function formatDateIndonesian(date: Date): { dayMonth: string, year: string } {
 
 // ─── Horizontal Calendar Day Item ───
 function CalendarDayItem({
-  dayName, date, isSelected, isToday, taskIndicators, onPress,
+  dayName, date, isSelected, isPast, hasNextPast, isToday, taskIndicators, onPress,
 }: {
   dayName: string;
   date: number;
   isSelected: boolean;
+  isPast?: boolean;
+  hasNextPast?: boolean;
   isToday: boolean;
   taskIndicators: { isIcon: boolean, value: string }[];
   onPress: () => void;
 }) {
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
+  
+  const isPurple = isSelected || isPast;
+  const ITEM_WIDTH = (SCREEN_WIDTH - sw(48)) / 7;
+
   return (
-    <InteractivePressable
-      style={[styles.dayItem, isSelected && styles.dayItemSelected]}
-      onPress={onPress}
-      hapticType={Haptics.ImpactFeedbackStyle.Light}
-    >
-      <Text style={[styles.dayName, isSelected && styles.dayTextSelected]}>
-        {dayName}
-      </Text>
-      <Text style={[styles.dayDate, isSelected && styles.dayTextSelected]}>
-        {date}
-      </Text>
-      {/* Task indicator icons below date */}
-      <View style={styles.dayIndicators}>
-        {taskIndicators.length > 0 ? (
-          taskIndicators.slice(0, 3).map((ind, idx) => {
-             const dotColors = ['#A855F7', '#38BDF8', '#22C55E'];
-             const defaultColor = dotColors[idx % dotColors.length];
-             
-             return (
-               <View key={idx} style={[styles.indicatorWrapper, { backgroundColor: defaultColor, marginLeft: idx > 0 ? -sw(6) : 0 }]}>
-                 {ind.isIcon ? (
-                   <Ionicons name={ind.value as any} size={sw(8)} color={Colors.white} />
-                 ) : (
-                   <View style={styles.dotIndicatorInner} />
-                 )}
-               </View>
-             );
-          })
-        ) : (
-          <View style={{ height: sw(14) }} />
-        )}
-      </View>
-    </InteractivePressable>
+    <View style={{ width: ITEM_WIDTH, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Garis penyambung antar tanggal terlewat */}
+      {isPast && hasNextPast && (
+        <Animated.View 
+          entering={FadeIn.delay(300).duration(600)}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: ITEM_WIDTH,
+            height: 4,
+            backgroundColor: Colors.brownDark,
+            zIndex: 0,
+            marginTop: -sw(6)
+          }} 
+        />
+      )}
+      <InteractivePressable
+        style={[styles.dayItem, { zIndex: 1 }]}
+        onPress={onPress}
+        hapticType={Haptics.ImpactFeedbackStyle.Light}
+      >
+        <Text style={styles.dayName}>
+          {dayName}
+        </Text>
+        <View style={[styles.dateCircle, isPurple && styles.dateCircleSelected]}>
+          <Text style={[styles.dayDate, isPurple && styles.dayTextSelected]}>
+            {date}
+          </Text>
+        </View>
+        {/* Task indicator icons below date */}
+        <View style={styles.dayIndicators}>
+          {taskIndicators.length > 0 ? (
+            taskIndicators.slice(0, 3).map((ind, idx) => {
+               const dotColors = ['#A855F7', '#38BDF8', '#22C55E'];
+               const defaultColor = dotColors[idx % dotColors.length];
+               
+               return (
+                 <View key={idx} style={[styles.indicatorWrapper, { backgroundColor: defaultColor, marginLeft: idx > 0 ? -sw(6) : 0 }]}>
+                   {ind.isIcon ? (
+                     <Ionicons name={ind.value as any} size={sw(8)} color={Colors.white} />
+                   ) : (
+                     <View style={styles.dotIndicatorInner} />
+                   )}
+                 </View>
+               );
+            })
+          ) : (
+            <View style={{ height: sw(14) }} />
+          )}
+        </View>
+      </InteractivePressable>
+    </View>
   );
 }
 
-// ─── Daily Task Card (Colorful cards like reference) ───
-function DailyTaskItem({ task, index }: { task: Task, index: number }) {
+function DailyTaskItem({ task, index, onCheck }: { task: Task, index: number, onCheck: () => void }) {
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
   const timeStr = task.scheduledStart && task.scheduledEnd
     ? `${task.scheduledStart} - ${task.scheduledEnd}`
     : task.deadlineTime
     ? task.deadlineTime
     : '';
   const cardColor = getTaskCardColor(task.title || index);
+  const isCompleted = task.status === 'completed';
 
   return (
     <Animated.View 
@@ -154,22 +184,24 @@ function DailyTaskItem({ task, index }: { task: Task, index: number }) {
       layout={Layout.springify()}
       style={styles.dailyRow}
     >
-      <View style={[styles.dailyItem, { backgroundColor: cardColor }]}>
+      <View style={[styles.dailyItem, { backgroundColor: cardColor }, isCompleted && { opacity: 0.7 }]}>
         {task.icon ? (
           <View style={styles.dailyIconWrap}>
             <Ionicons name={task.icon as any} size={sw(18)} color={Colors.white} />
           </View>
         ) : null}
         <View style={styles.dailyTextWrap}>
-          <Text style={styles.dailyTitle} numberOfLines={1}>
+          <Text style={[styles.dailyTitle, isCompleted && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
             {task.title}
           </Text>
           {timeStr ? (
-            <Text style={styles.dailyTime}>{timeStr}</Text>
+            <Text style={[styles.dailyTime, isCompleted && { textDecorationLine: 'line-through' }]}>{timeStr}</Text>
           ) : null}
         </View>
-        <InteractivePressable style={styles.dailyCheckBtn}>
-          <Ionicons name="checkmark" size={sw(16)} color={cardColor} />
+        <InteractivePressable style={styles.dailyCheckBtn} onPress={onCheck}>
+          {isCompleted && (
+            <Ionicons name="checkmark" size={sw(20)} color={cardColor} />
+          )}
         </InteractivePressable>
       </View>
     </Animated.View>
@@ -184,6 +216,9 @@ function WeeklyTaskItem({
   index: number;
   onCheck: () => void;
 }) {
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
+
   const taskDate = parseTaskDate(task.date);
   const dateLabel = taskDate
     ? `${taskDate.getDate()}  ${MONTHS_SHORT[taskDate.getMonth()]}`
@@ -210,7 +245,7 @@ function WeeklyTaskItem({
         <Ionicons 
           name={isCompleted ? "checkmark-circle" : "ellipse-outline"} 
           size={sw(24)} 
-          color={isCompleted ? "#19D231" : "rgba(0,0,0,0.3)"} 
+          color={isCompleted ? "#19D231" : Colors.brown} 
         />
       </InteractivePressable>
     </Animated.View>
@@ -227,6 +262,9 @@ function MiniCalendarDropdown({
   selectedDate: string;
   tasks: Task[];
 }) {
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
+
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
 
@@ -258,88 +296,63 @@ function MiniCalendarDropdown({
     tasks.forEach((t) => {
       const d = parseTaskDate(t.date);
       if (d) {
-        const dateStr = formatLocalDate(d);
-        if (!m[dateStr]) m[dateStr] = [];
-        // Show up to 3 different task colors as dots
-        if (m[dateStr].length < 3) {
-          const color = getTaskCardColor(t.id || t.title);
-          if (!m[dateStr].includes(color)) {
-            m[dateStr].push(color);
-          }
-        }
+        const key = formatLocalDate(d);
+        if (!m[key]) m[key] = [];
+        if (t.icon) m[key].push(t.icon);
       }
     });
     return m;
   }, [tasks]);
 
-  const todayStr = formatLocalDate(new Date());
-  const cellW = (SCREEN_WIDTH - sw(80)) / 7;
-
-  if (!visible) return null;
-
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <TouchableOpacity style={miniStyles.overlay} activeOpacity={1} onPress={onClose}>
-        <Animated.View entering={FadeInDown.duration(300).springify()} style={miniStyles.container}>
-          {/* Month nav */}
-          <View style={miniStyles.monthRow}>
-            <InteractivePressable onPress={() => {
-              if (month === 0) { setMonth(11); setYear(year - 1); } else setMonth(month - 1);
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <Animated.View 
+          entering={FadeInDown.duration(300).springify()}
+          style={styles.modalContent}
+          onStartShouldSetResponder={() => true}
+        >
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => {
+              if (month === 0) { setMonth(11); setYear(y => y - 1); } else { setMonth(m => m - 1); }
             }}>
-              <Ionicons name="chevron-back" size={sw(18)} color={Colors.brownDark} />
-            </InteractivePressable>
-            <Text style={miniStyles.monthText}>{MONTHS_ID[month]} {year}</Text>
-            <InteractivePressable onPress={() => {
-              if (month === 11) { setMonth(0); setYear(year + 1); } else setMonth(month + 1);
+              <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.modalMonthText}>{MONTHS_ID[month]} {year}</Text>
+            <TouchableOpacity onPress={() => {
+              if (month === 11) { setMonth(0); setYear(y => y + 1); } else { setMonth(m => m + 1); }
             }}>
-              <Ionicons name="chevron-forward" size={sw(18)} color={Colors.brownDark} />
-            </InteractivePressable>
+              <Ionicons name="chevron-forward" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
           </View>
 
-          {/* Day headers */}
-          <View style={miniStyles.dayHeaderRow}>
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <Text key={i} style={[miniStyles.dayHeader, { width: cellW }]}>{d}</Text>
+          <View style={styles.modalDaysRow}>
+            {DAY_NAMES_SHORT.map((d, i) => (
+              <Text key={i} style={styles.modalDayName}>{d}</Text>
             ))}
           </View>
 
-          {/* Grid */}
-          <View style={miniStyles.grid}>
-            {calDays.map((day, idx) => {
-              const isSelected = day.dateStr === selectedDate;
-              const isToday = day.dateStr === todayStr;
-              const dayTasks = taskMap[day.dateStr];
-
+          <View style={styles.modalDaysGrid}>
+            {calDays.map((d, i) => {
+              const isSelected = d.dateStr === selectedDate;
               return (
-                <InteractivePressable
-                  key={idx}
-                  style={[miniStyles.cell, { width: cellW }, isSelected && miniStyles.cellSelected]}
-                  onPress={() => {
-                    onSelectDate(day.dateStr);
-                    onClose();
-                  }}
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.modalDayCell, isSelected && styles.modalDaySelected]}
+                  onPress={() => { onSelectDate(d.dateStr); onClose(); }}
                 >
                   <Text style={[
-                    miniStyles.cellText,
-                    !day.isCurrent && { opacity: 0.3 },
-                    isSelected && { color: Colors.white, fontWeight: '700' },
-                    isToday && !isSelected && { color: Colors.brownDark, fontWeight: '800' },
-                  ]}>{day.date}</Text>
-                  {dayTasks && dayTasks.length > 0 && (
-                    <View style={miniStyles.dotRow}>
-                      {dayTasks.map((color, i) => (
-                        <View 
-                          key={i} 
-                          style={[
-                            miniStyles.dot, 
-                            { backgroundColor: isSelected ? Colors.white : color }
-                          ]} 
-                        />
-                      ))}
-                    </View>
+                    styles.modalDayText,
+                    !d.isCurrent && { color: Colors.textMuted },
+                    isSelected && { color: Colors.white, fontWeight: 'bold' }
+                  ]}>
+                    {d.date}
+                  </Text>
+                  {taskMap[d.dateStr] && (
+                    <View style={styles.modalTaskDot} />
                   )}
-                </InteractivePressable>
-              );
+                </TouchableOpacity>
+              )
             })}
           </View>
         </Animated.View>
@@ -348,27 +361,14 @@ function MiniCalendarDropdown({
   );
 }
 
-const miniStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center' },
-  container: { backgroundColor: Colors.beige, borderRadius: Radius.xl, padding: Spacing.lg, width: SCREEN_WIDTH - sw(48), ...Shadow.lg },
-  monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
-  monthText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
-  dayHeaderRow: { flexDirection: 'row', marginBottom: Spacing.xs },
-  dayHeader: { textAlign: 'center', fontSize: FontSize.xxs, fontWeight: '600', color: Colors.textMuted },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { alignItems: 'center', paddingVertical: sw(5), borderRadius: Radius.sm },
-  cellSelected: { backgroundColor: Colors.brownDark },
-  cellText: { fontSize: FontSize.sm, color: Colors.textPrimary },
-  dotRow: { flexDirection: 'row', gap: sw(2), marginTop: sw(1), justifyContent: 'center' },
-  dot: { width: sw(4), height: sw(4), borderRadius: sw(2), backgroundColor: Colors.calendarDot },
-});
-
 // ─── Main Home Screen ───
 export default function HomeScreen() {
   const { user } = useAuth();
   const { tasks, toggleStatus } = useTasks();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
   const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -376,6 +376,15 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState(formatLocalDate(today));
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [isWeeklyListVisible, setIsWeeklyListVisible] = useState(true);
+  const [toasts, setToasts] = useState<{ id: string, message: string }[]>([]);
+
+  const triggerToast = useCallback((message: string) => {
+    const id = Math.random().toString(36).substring(7);
+    setToasts((prev) => [...prev, { id, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 2500);
+  }, []);
 
   const weeks = useMemo(() => generateWeeks(today, 8, 8), []);
   const initialWeekIndex = 8; // center week
@@ -384,7 +393,7 @@ export default function HomeScreen() {
     return tasks.filter((t) => {
       const d = parseTaskDate(t.date);
       if (!d) return false;
-      return formatLocalDate(d) === dateStr && t.status !== 'completed';
+      return formatLocalDate(d) === dateStr;
     });
   }, [tasks]);
 
@@ -408,6 +417,23 @@ export default function HomeScreen() {
   const todayStr = formatLocalDate(today);
   const isSelectedToday = selectedDate === todayStr;
 
+  const tasksThisMonth = useMemo(() => {
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    return tasks.filter((t) => {
+      const d = parseTaskDate(t.date);
+      return d && d.getMonth() === currentMonth && d.getFullYear() === currentYear && t.status !== 'completed';
+    }).length;
+  }, [tasks, today]);
+
+  const tasksThisWeek = useMemo(() => {
+    const { monday, sunday } = getCurrentWeekRange(today);
+    return tasks.filter((t) => {
+      const d = parseTaskDate(t.date);
+      return d && d >= monday && d <= sunday && t.status !== 'completed';
+    }).length;
+  }, [tasks, today]);
+
   const selectedDayLabel = isSelectedToday ? 'Hari ini' : (() => {
     const d = new Date(selectedDate + 'T00:00:00');
     const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -415,9 +441,8 @@ export default function HomeScreen() {
   })();
 
   const displayedDate = useMemo(() => {
-    const d = new Date(selectedDate + 'T00:00:00');
-    return formatDateIndonesian(d);
-  }, [selectedDate]);
+    return formatDateIndonesian(today);
+  }, []);
 
   const handleCheck = async (taskId: string) => {
     try {
@@ -436,10 +461,13 @@ export default function HomeScreen() {
   const renderWeekItem = useCallback(({ item }: { item: typeof weeks[0] }) => {
     return (
       <View style={styles.weekRow}>
-        {item.days.map((day) => {
+        {item.days.map((day, index) => {
           const isToday = day.dateStr === todayStr;
           const isSelected = day.dateStr === selectedDate;
           const indicators = getTaskIndicatorsForDate(day.dateStr);
+          const isPast = day.dateStr < todayStr;
+          const nextDay = item.days[index + 1];
+          const hasNextPast = nextDay ? (nextDay.dateStr < todayStr) : false;
 
           return (
             <CalendarDayItem
@@ -447,6 +475,8 @@ export default function HomeScreen() {
               dayName={day.dayName}
               date={day.date}
               isSelected={isSelected}
+              isPast={isPast}
+              hasNextPast={hasNextPast}
               isToday={isToday}
               taskIndicators={indicators}
               onPress={() => setSelectedDate(day.dateStr)}
@@ -468,6 +498,16 @@ export default function HomeScreen() {
           <Text style={styles.dateTitle}>
             {displayedDate.dayMonth} <Text style={styles.dateYear}>{displayedDate.year}</Text>
           </Text>
+          <View style={styles.statsBadgeRow}>
+            <View style={styles.miniStatsBadge}>
+              <Text style={styles.miniStatsValue}>{tasksThisMonth}</Text>
+              <Text style={styles.miniStatsLabel}>Kegiatan Bulan ini</Text>
+            </View>
+            <View style={styles.miniStatsBadge}>
+              <Text style={styles.miniStatsValue}>{tasksThisWeek}</Text>
+              <Text style={styles.miniStatsLabel}>Kegiatan Minggu ini</Text>
+            </View>
+          </View>
         </InteractivePressable>
         <InteractivePressable
           onPress={() => router.push('/(tabs)/settings')}
@@ -515,6 +555,8 @@ export default function HomeScreen() {
         }
       >
 
+
+
         {/* ── Daily Activities Section (Brown Card) ── */}
         <Animated.View entering={FadeInDown.delay(200).duration(600).springify()} style={styles.dailySection}>
           <View style={styles.dailyHeader}>
@@ -524,7 +566,17 @@ export default function HomeScreen() {
           {selectedDayTasks.length > 0 ? (
             <View style={styles.dailyList}>
               {selectedDayTasks.map((task, index) => (
-                <DailyTaskItem key={task.id} task={task} index={index} />
+                <DailyTaskItem 
+                  key={task.id} 
+                  task={task} 
+                  index={index} 
+                  onCheck={() => {
+                    handleCheck(task.id);
+                    if (task.status !== 'completed') {
+                      triggerToast(`Jadwal ${task.title} selesai`);
+                    }
+                  }}
+                />
               ))}
             </View>
           ) : (
@@ -541,7 +593,7 @@ export default function HomeScreen() {
             onPress={() => setIsWeeklyListVisible(!isWeeklyListVisible)}
             hapticType={Haptics.ImpactFeedbackStyle.Light}
           >
-            <Text style={styles.weeklyHeaderText}>List kegiatan dalam 1 minggu</Text>
+            <Text style={styles.weeklyHeaderText}>List kegiatan dalam 1 Minggu </Text>
           </InteractivePressable>
 
           {isWeeklyListVisible && (
@@ -552,7 +604,12 @@ export default function HomeScreen() {
                     key={task.id}
                     task={task}
                     index={index}
-                    onCheck={() => handleCheck(task.id)}
+                    onCheck={() => {
+                      handleCheck(task.id);
+                      if (task.status !== 'completed') {
+                        triggerToast(`Jadwal ${task.title} selesai`);
+                      }
+                    }}
                   />
                 ))}
               </View>
@@ -575,12 +632,27 @@ export default function HomeScreen() {
         selectedDate={selectedDate}
         tasks={tasks}
       />
+
+      {/* Custom Toast Notification */}
+      <View style={[styles.toastWrapper, { top: insets.top + sw(20) }]} pointerEvents="none">
+        {toasts.map((toast) => (
+          <Animated.View 
+            key={toast.id}
+            entering={SlideInRight.springify()} 
+            exiting={SlideOutRight.duration(300)}
+            style={styles.toastContainer}
+          >
+            <Ionicons name="checkmark-circle" size={sw(20)} color={Colors.white} />
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </Animated.View>
+        ))}
+      </View>
     </View>
   );
 }
 
-// ─── Styles (Dark Premium) ───
-const styles = StyleSheet.create({
+// ─── Styles (Dynamic) ───
+const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.cream,
@@ -601,9 +673,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: Radius.xxl,
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sw(8),
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   dateTitle: {
     fontSize: FontSize.hero,
@@ -614,6 +685,32 @@ const styles = StyleSheet.create({
   dateYear: {
     color: Colors.textSecondary,
     fontWeight: '500',
+  },
+  statsBadgeRow: {
+    flexDirection: 'row',
+    gap: sw(6),
+    marginTop: sw(4),
+  },
+  miniStatsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(139, 115, 85, 0.08)',
+    paddingHorizontal: sw(8),
+    paddingVertical: sw(3),
+    borderRadius: Radius.sm,
+  },
+  miniStatsValue: {
+    fontSize: FontSize.xxs,
+    fontWeight: '800',
+    color: Colors.brownDark,
+    marginRight: sw(3),
+  },
+  miniStatsLabel: {
+    fontSize: FontSize.xxs - 1,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   avatar: {
     width: sw(46),
@@ -646,11 +743,18 @@ const styles = StyleSheet.create({
   },
   dayItem: {
     alignItems: 'center',
-    width: (SCREEN_WIDTH - sw(48)) / 7,
+    width: sw(42),
     paddingVertical: sw(10),
     borderRadius: Radius.full,
   },
-  dayItemSelected: {
+  dateCircle: {
+    width: sw(34),
+    height: sw(34),
+    borderRadius: sw(17),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateCircleSelected: {
     backgroundColor: Colors.brownDark,
     ...Shadow.glow,
   },
@@ -701,6 +805,28 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     marginBottom: Spacing.xl,
     ...Shadow.md,
+  },
+  toastWrapper: {
+    position: 'absolute',
+    right: Spacing.md,
+    zIndex: 100,
+    gap: Spacing.sm,
+    alignItems: 'flex-end',
+  },
+  toastContainer: {
+    backgroundColor: Colors.brownDark,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    ...Shadow.md,
+  },
+  toastText: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: FontSize.sm,
+    marginLeft: Spacing.xs,
   },
   dailyHeader: {
     flexDirection: 'row',
@@ -824,4 +950,17 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.textMuted,
   },
+
+  // Modal styles (mini calendar)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: Colors.beige, borderRadius: Radius.xl, padding: Spacing.lg, width: SCREEN_WIDTH - sw(48), ...Shadow.lg },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  modalMonthText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
+  modalDaysRow: { flexDirection: 'row', marginBottom: Spacing.xs },
+  modalDayName: { flex: 1, textAlign: 'center', fontSize: FontSize.xxs, fontWeight: '600', color: Colors.textMuted },
+  modalDaysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  modalDayCell: { width: `${100 / 7}%`, alignItems: 'center', paddingVertical: sw(8), borderRadius: Radius.sm },
+  modalDaySelected: { backgroundColor: Colors.brownDark },
+  modalDayText: { fontSize: FontSize.sm, color: Colors.textPrimary },
+  modalTaskDot: { width: sw(4), height: sw(4), borderRadius: sw(2), backgroundColor: Colors.brown, marginTop: sw(2) },
 });
