@@ -25,6 +25,7 @@ export function useNotes() {
     setNotes,
     setNotesLoading,
     setError,
+    setOffline,
   } = useTaskStore();
 
   // Subscribe to realtime updates
@@ -32,10 +33,20 @@ export function useNotes() {
     if (!user?.uid) return;
 
     setNotesLoading(true);
-    const unsubscribe = subscribeToNoteLists(user.uid, (updatedNotes) => {
-      setNotes(updatedNotes);
-      setNotesLoading(false);
-    });
+    const unsubscribe = subscribeToNoteLists(
+      user.uid,
+      (updatedNotes) => {
+        setNotes(updatedNotes);
+        setNotesLoading(false);
+        setOffline(false);
+        setError(null);
+      },
+      (subscriptionError, isOffline) => {
+        setNotesLoading(false);
+        setOffline(isOffline);
+        setError(subscriptionError.message);
+      }
+    );
 
     return unsubscribe;
   }, [user?.uid]);

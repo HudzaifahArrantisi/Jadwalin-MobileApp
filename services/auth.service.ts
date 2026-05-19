@@ -17,6 +17,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile } from '@/types/task.types';
+import { getUserFriendlyError, isNetworkError } from '@/utils/networkError';
 
 // ──── Helpers ────
 
@@ -111,7 +112,8 @@ export async function resetPassword(email: string): Promise<void> {
 
 /** Listen to auth state changes */
 export function onAuthChanged(
-  callback: (user: UserProfile | null) => void
+  callback: (user: UserProfile | null) => void,
+  onError?: (error: Error, isOffline: boolean) => void
 ): () => void {
   let unsubscribeSnapshot: (() => void) | null = null;
 
@@ -144,6 +146,7 @@ export function onAuthChanged(
           }
         }
       }, (error) => {
+        onError?.(new Error(getUserFriendlyError(error)), isNetworkError(error));
         callback(mapFirebaseUser(firebaseUser));
       });
     } else {
@@ -153,6 +156,9 @@ export function onAuthChanged(
       }
       callback(null);
     }
+  }, (error) => {
+    onError?.(new Error(getUserFriendlyError(error)), isNetworkError(error));
+    callback(null);
   });
 
   return () => {

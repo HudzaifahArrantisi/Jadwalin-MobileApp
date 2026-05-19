@@ -14,9 +14,7 @@ module.exports = {
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       backgroundColor: "#000000",
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      foregroundImage: "./assets/images/icon.png",
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
@@ -32,7 +30,7 @@ module.exports = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/spalsh.png",
+        image: "./assets/images/icon.png",
         imageWidth: 260,
         resizeMode: "contain",
         backgroundColor: "#6A3DE8",

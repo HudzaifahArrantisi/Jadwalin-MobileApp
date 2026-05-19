@@ -1,8 +1,4 @@
-// ============================================
-// Jadwalin App — Profile Screen (BEIGE EDITION)
-// Bug 9: Photo upload with expo-image-picker
-// ============================================
-
+// halaman setting.tex 
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,

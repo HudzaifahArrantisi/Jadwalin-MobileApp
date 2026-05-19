@@ -22,6 +22,7 @@ import {
   CreateNoteListInput,
   UpdateNoteListInput,
 } from '@/types/task.types';
+import { getUserFriendlyError, isNetworkError } from '@/utils/networkError';
 
 // ──── Helpers ────
 
@@ -124,11 +125,14 @@ export async function fetchNoteLists(userId: string): Promise<NoteList[]> {
 /** Subscribe to realtime note list updates */
 export function subscribeToNoteLists(
   userId: string,
-  callback: (notes: NoteList[]) => void
+  callback: (notes: NoteList[]) => void,
+  onError?: (error: Error, isOffline: boolean) => void
 ): () => void {
   const q = query(notesRef(userId), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snapshot) => {
     const notes = snapshot.docs.map(docToNote);
     callback(notes);
+  }, (error) => {
+    onError?.(new Error(getUserFriendlyError(error)), isNetworkError(error));
   });
 }

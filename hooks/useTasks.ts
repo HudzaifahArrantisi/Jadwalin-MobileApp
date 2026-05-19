@@ -35,6 +35,7 @@ export function useTasks() {
     setTasks,
     setLoading,
     setError,
+    setOffline,
   } = useTaskStore();
 
   // Subscribe to realtime updates + auto-sync widget
@@ -42,14 +43,24 @@ export function useTasks() {
     if (!user?.uid) return;
 
     setLoading(true);
-    const unsubscribe = subscribeToTasks(user.uid, (updatedTasks) => {
-      setTasks(updatedTasks);
-      setLoading(false);
-      // Auto-sync widget data whenever tasks change
-      syncWidgetData(updatedTasks).catch((err) => {
-        console.warn('[useTasks] Widget sync failed:', err);
-      });
-    });
+    const unsubscribe = subscribeToTasks(
+      user.uid,
+      (updatedTasks) => {
+        setTasks(updatedTasks);
+        setLoading(false);
+        setOffline(false);
+        setError(null);
+        // Auto-sync widget data whenever tasks change
+        syncWidgetData(updatedTasks).catch((err) => {
+          console.warn('[useTasks] Widget sync failed:', err);
+        });
+      },
+      (subscriptionError, isOffline) => {
+        setLoading(false);
+        setOffline(isOffline);
+        setError(subscriptionError.message);
+      }
+    );
 
     return unsubscribe;
   }, [user?.uid]);

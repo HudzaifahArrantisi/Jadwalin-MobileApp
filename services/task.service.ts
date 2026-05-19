@@ -12,6 +12,7 @@ import { db } from './firebase';
 import {
   Task, CreateTaskInput, UpdateTaskInput, TaskStatus,
 } from '@/types/task.types';
+import { getUserFriendlyError, isNetworkError } from '@/utils/networkError';
 
 // ──── Helpers ────
 
@@ -154,12 +155,15 @@ export async function fetchTasks(userId: string): Promise<Task[]> {
 /** Subscribe to realtime task updates */
 export function subscribeToTasks(
   userId: string,
-  callback: (tasks: Task[]) => void
+  callback: (tasks: Task[]) => void,
+  onError?: (error: Error, isOffline: boolean) => void
 ): () => void {
   const q = query(tasksRef(userId), orderBy('date', 'asc'));
   return onSnapshot(q, (snapshot) => {
     const tasks = snapshot.docs.map(docToTask);
     callback(tasks);
+  }, (error) => {
+    onError?.(new Error(getUserFriendlyError(error)), isNetworkError(error));
   });
 }
 

@@ -7,10 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { 
-  FadeInDown, FadeIn, FadeInRight, SlideInRight, SlideOutRight,
+  FadeInDown, FadeIn, FadeInRight, FadeOutLeft, SlideInRight, SlideOutRight,
   Layout, useSharedValue, useAnimatedStyle, 
   withSpring, withTiming, runOnJS 
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
@@ -167,7 +168,17 @@ function CalendarDayItem({
   );
 }
 
-function DailyTaskItem({ task, index, onCheck }: { task: Task, index: number, onCheck: () => void }) {
+function DailyTaskItem({ 
+  task, 
+  index, 
+  onCheck, 
+  onDelete 
+}: { 
+  task: Task, 
+  index: number, 
+  onCheck: () => void, 
+  onDelete: () => void 
+}) {
   const { Colors, isDark } = useAppTheme();
   const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
   const timeStr = task.scheduledStart && task.scheduledEnd
@@ -178,43 +189,103 @@ function DailyTaskItem({ task, index, onCheck }: { task: Task, index: number, on
   const cardColor = getTaskCardColor(task.title || index);
   const isCompleted = task.status === 'completed';
 
+  const translateX = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  const SWIPE_THRESHOLD = 80;
+
+  const triggerComplete = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onCheck();
+  }, [onCheck]);
+
+  const triggerDelete = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    onDelete();
+  }, [onDelete]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
+    })
+    .onEnd((event) => {
+      if (event.translationX < -SWIPE_THRESHOLD) {
+        runOnJS(triggerDelete)();
+      } else if (event.translationX > SWIPE_THRESHOLD) {
+        runOnJS(triggerComplete)();
+      }
+      translateX.value = withSpring(0, { damping: 15 });
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { scale: scale.value }
+    ],
+  }));
+
+  const deleteAction = useAnimatedStyle(() => ({
+    opacity: translateX.value < -30 ? withTiming(1) : withTiming(0),
+  }));
+
+  const completeAction = useAnimatedStyle(() => ({
+    opacity: translateX.value > 30 ? withTiming(1) : withTiming(0),
+  }));
+
   return (
     <Animated.View 
       entering={FadeInRight.delay(index * 100).duration(400).springify()}
+      exiting={FadeOutLeft.duration(300)}
       layout={Layout.springify()}
-      style={styles.dailyRow}
+      style={styles.dailyRowWrapper}
     >
-      <View style={[styles.dailyItem, { backgroundColor: cardColor }, isCompleted && { opacity: 0.7 }]}>
-        {task.icon ? (
-          <View style={styles.dailyIconWrap}>
-            <Ionicons name={task.icon as any} size={sw(18)} color={Colors.white} />
-          </View>
-        ) : null}
-        <View style={styles.dailyTextWrap}>
-          <Text style={[styles.dailyTitle, isCompleted && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
-            {task.title}
-          </Text>
-          {timeStr ? (
-            <Text style={[styles.dailyTime, isCompleted && { textDecorationLine: 'line-through' }]}>{timeStr}</Text>
-          ) : null}
-        </View>
-        <InteractivePressable style={styles.dailyCheckBtn} onPress={onCheck}>
-          {isCompleted && (
-            <Ionicons name="checkmark" size={sw(20)} color={cardColor} />
-          )}
-        </InteractivePressable>
+      {/* Background Actions */}
+      <View style={styles.actionsContainer}>
+        <Animated.View style={[styles.completeAction, completeAction]}>
+          <Ionicons name="checkmark-circle" size={24} color="#19D231" />
+          <Text style={[styles.actionLabel, { color: '#19D231' }]}>Selesai</Text>
+        </Animated.View>
+        <Animated.View style={[styles.deleteAction, deleteAction]}>
+          <Text style={[styles.actionLabel, { color: '#FF3B30' }]}>Hapus</Text>
+          <Ionicons name="trash" size={24} color="#FF3B30" />
+        </Animated.View>
       </View>
+
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.dailyItem, { backgroundColor: cardColor }, isCompleted && { opacity: 0.7 }, animatedStyle]}>
+          {task.icon ? (
+            <View style={styles.dailyIconWrap}>
+              <Ionicons name={task.icon as any} size={sw(18)} color={Colors.white} />
+            </View>
+          ) : null}
+          <View style={styles.dailyTextWrap}>
+            <Text style={[styles.dailyTitle, isCompleted && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
+              {task.title}
+            </Text>
+            {timeStr ? (
+              <Text style={[styles.dailyTime, isCompleted && { textDecorationLine: 'line-through' }]}>{timeStr}</Text>
+            ) : null}
+          </View>
+          <InteractivePressable style={styles.dailyCheckBtn} onPress={onCheck}>
+            {isCompleted && (
+              <Ionicons name="checkmark" size={sw(20)} color={cardColor} />
+            )}
+          </InteractivePressable>
+        </Animated.View>
+      </GestureDetector>
     </Animated.View>
   );
 }
 
 // ─── Weekly Task Row (White with border, green when completed) ───
 function WeeklyTaskItem({
-  task, index, onCheck,
+  task, index, onCheck, onDelete
 }: {
   task: Task;
   index: number;
   onCheck: () => void;
+  onDelete: () => void;
 }) {
   const { Colors, isDark } = useAppTheme();
   const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
@@ -226,29 +297,155 @@ function WeeklyTaskItem({
 
   const isCompleted = task.status === 'completed';
 
+  const translateX = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  const SWIPE_THRESHOLD = 80;
+
+  const triggerComplete = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onCheck();
+  }, [onCheck]);
+
+  const triggerDelete = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    onDelete();
+  }, [onDelete]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
+    })
+    .onEnd((event) => {
+      if (event.translationX < -SWIPE_THRESHOLD) {
+        runOnJS(triggerDelete)();
+      } else if (event.translationX > SWIPE_THRESHOLD) {
+        runOnJS(triggerComplete)();
+      }
+      translateX.value = withSpring(0, { damping: 15 });
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { scale: scale.value }
+    ],
+  }));
+
+  const deleteAction = useAnimatedStyle(() => ({
+    opacity: translateX.value < -30 ? withTiming(1) : withTiming(0),
+  }));
+
+  const completeAction = useAnimatedStyle(() => ({
+    opacity: translateX.value > 30 ? withTiming(1) : withTiming(0),
+  }));
+
   return (
     <Animated.View 
       entering={FadeInDown.delay(index * 50).duration(400).springify()}
+      exiting={FadeOutLeft.duration(300)}
       layout={Layout.springify()}
+      style={styles.weeklyRowWrapper}
     >
-      <InteractivePressable 
-        onPress={onCheck}
-        hapticType={Haptics.ImpactFeedbackStyle.Medium}
-        style={[styles.weeklyItem, isCompleted && { opacity: 0.6 }]}
-      >
-        <Text style={[styles.weeklyDate, isCompleted && { textDecorationLine: 'line-through' }]}>
-          {dateLabel}
-        </Text>
-        <Text style={[styles.weeklyTitle, isCompleted && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
-          {task.title}
-        </Text>
-        <Ionicons 
-          name={isCompleted ? "checkmark-circle" : "ellipse-outline"} 
-          size={sw(24)} 
-          color={isCompleted ? "#19D231" : Colors.brown} 
-        />
-      </InteractivePressable>
+      {/* Background Actions */}
+      <View style={styles.actionsContainer}>
+        <Animated.View style={[styles.completeAction, completeAction]}>
+          <Ionicons name="checkmark-circle" size={24} color="#19D231" />
+          <Text style={[styles.actionLabel, { color: '#19D231' }]}>Selesai</Text>
+        </Animated.View>
+        <Animated.View style={[styles.deleteAction, deleteAction]}>
+          <Text style={[styles.actionLabel, { color: '#FF3B30' }]}>Hapus</Text>
+          <Ionicons name="trash" size={24} color="#FF3B30" />
+        </Animated.View>
+      </View>
+
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[animatedStyle, { width: '100%' }]}>
+          <InteractivePressable 
+            onPress={onCheck}
+            hapticType={Haptics.ImpactFeedbackStyle.Medium}
+            style={[styles.weeklyItem, isCompleted && { opacity: 0.6 }]}
+          >
+            <Text style={[styles.weeklyDate, isCompleted && { textDecorationLine: 'line-through' }]}>
+              {dateLabel}
+            </Text>
+            <Text style={[styles.weeklyTitle, isCompleted && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
+              {task.title}
+            </Text>
+            <Ionicons 
+              name={isCompleted ? "checkmark-circle" : "ellipse-outline"} 
+              size={sw(24)} 
+              color={isCompleted ? "#19D231" : Colors.brown} 
+            />
+          </InteractivePressable>
+        </Animated.View>
+      </GestureDetector>
     </Animated.View>
+  );
+}
+
+// ─── Custom Delete Confirmation Modal ───
+function DeleteTaskModal({
+  visible,
+  taskTitle,
+  onClose,
+  onConfirm
+}: {
+  visible: boolean;
+  taskTitle: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { Colors, isDark } = useAppTheme();
+  const styles = useMemo(() => getStyles(Colors, isDark), [Colors, isDark]);
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <Animated.View 
+          entering={FadeInDown.springify().damping(15)}
+          style={styles.customModalContent}
+        >
+          <View style={styles.modalHeaderRow}>
+            <View style={styles.warningIconContainer}>
+              <Ionicons name="warning" size={32} color="#FF3B30" />
+            </View>
+            <Text style={styles.customModalTitle}>
+              Hapus Jadwal
+            </Text>
+          </View>
+
+          <Text style={styles.customModalDesc}>
+            Apakah kamu yakin ingin menghapus jadwal <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>"{taskTitle}"</Text>? Tindakan ini tidak dapat dibatalkan.
+          </Text>
+
+          <View style={styles.modalButtonsRow}>
+            <TouchableOpacity 
+              activeOpacity={0.7}
+              style={styles.modalCancelBtn} 
+              onPress={onClose}
+            >
+              <Text style={styles.modalCancelText}>Batal</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              activeOpacity={0.7}
+              style={styles.modalDeleteConfirmBtn} 
+              onPress={onConfirm}
+            >
+              <Text style={styles.modalDeleteConfirmText}>Hapus</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
@@ -364,7 +561,7 @@ function MiniCalendarDropdown({
 // ─── Main Home Screen ───
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { tasks, toggleStatus } = useTasks();
+  const { tasks, toggleStatus, removeTask } = useTasks();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { Colors, isDark } = useAppTheme();
@@ -377,6 +574,7 @@ export default function HomeScreen() {
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [isWeeklyListVisible, setIsWeeklyListVisible] = useState(true);
   const [toasts, setToasts] = useState<{ id: string, message: string }[]>([]);
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
   const triggerToast = useCallback((message: string) => {
     const id = Math.random().toString(36).substring(7);
@@ -576,6 +774,9 @@ export default function HomeScreen() {
                       triggerToast(`Jadwal ${task.title} selesai`);
                     }
                   }}
+                  onDelete={() => {
+                    setDeletingTask(task);
+                  }}
                 />
               ))}
             </View>
@@ -610,6 +811,9 @@ export default function HomeScreen() {
                         triggerToast(`Jadwal ${task.title} selesai`);
                       }
                     }}
+                    onDelete={() => {
+                      setDeletingTask(task);
+                    }}
                   />
                 ))}
               </View>
@@ -623,6 +827,20 @@ export default function HomeScreen() {
 
         <View style={{ height: sw(120) }} />
       </ScrollView>
+
+      {/* Delete Task Modal */}
+      <DeleteTaskModal
+        visible={!!deletingTask}
+        taskTitle={deletingTask?.title || ''}
+        onClose={() => setDeletingTask(null)}
+        onConfirm={async () => {
+          if (deletingTask) {
+            await removeTask(deletingTask.id);
+            setDeletingTask(null);
+            triggerToast(`Jadwal ${deletingTask.title} dihapus`);
+          }
+        }}
+      />
 
       {/* Mini Calendar Modal */}
       <MiniCalendarDropdown
@@ -842,6 +1060,12 @@ const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
   dailyList: {
     gap: Spacing.sm,
   },
+  dailyRowWrapper: {
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: Radius.xl,
+  },
   dailyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -853,6 +1077,29 @@ const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
     borderRadius: Radius.xl,
     paddingHorizontal: Spacing.md,
     paddingVertical: sw(14),
+  },
+  actionsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.xl,
+    zIndex: -1,
+  },
+  completeAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  deleteAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  actionLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
   },
   dailyIconWrap: {
     width: sw(32),
@@ -914,6 +1161,13 @@ const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
     fontWeight: '700',
     color: Colors.textPrimary,
   },
+  weeklyRowWrapper: {
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.sm,
+  },
   weeklyItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -921,7 +1175,6 @@ const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: Colors.beige,
     paddingHorizontal: Spacing.md,
     paddingVertical: sw(16),
-    marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.inputBorder,
   },
@@ -954,6 +1207,72 @@ const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
   // Modal styles (mini calendar)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { backgroundColor: Colors.beige, borderRadius: Radius.xl, padding: Spacing.lg, width: SCREEN_WIDTH - sw(48), ...Shadow.lg },
+  customModalContent: {
+    backgroundColor: Colors.dailyCardBg || Colors.beige,
+    borderRadius: Radius.xxl,
+    padding: Spacing.xl,
+    width: SCREEN_WIDTH - sw(48),
+    ...Shadow.lg,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  warningIconContainer: {
+    width: sw(48),
+    height: sw(48),
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customModalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  customModalDesc: {
+    fontSize: FontSize.md,
+    lineHeight: sw(22),
+    color: Colors.textMuted,
+    marginBottom: Spacing.xl,
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: sw(14),
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  modalDeleteConfirmBtn: {
+    flex: 1,
+    paddingVertical: sw(14),
+    borderRadius: Radius.xl,
+    backgroundColor: '#FF3B30',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.sm,
+  },
+  modalDeleteConfirmText: {
+    color: '#FFFFFF',
+    fontSize: FontSize.md,
+    fontWeight: '700',
+  },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   modalMonthText: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
   modalDaysRow: { flexDirection: 'row', marginBottom: Spacing.xs },

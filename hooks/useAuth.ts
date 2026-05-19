@@ -13,14 +13,22 @@ export function useAuth() {
     isAuthLoading,
     setUser,
     setAuthLoading,
+    setOffline,
+    setError,
   } = useTaskStore();
 
   // Listen to Firebase auth state
   useEffect(() => {
     setAuthLoading(true);
-    const unsubscribe = onAuthChanged((firebaseUser) => {
-      setUser(firebaseUser);
-    });
+    const unsubscribe = onAuthChanged(
+      (firebaseUser) => {
+        setUser(firebaseUser);
+      },
+      (error, isOffline) => {
+        setOffline(isOffline);
+        setError(error.message);
+      }
+    );
 
     return unsubscribe;
   }, []);

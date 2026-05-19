@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -11,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTaskStore } from '@/store/taskStore';
 import { requestNotificationPermission } from '@/services/notification.service';
 import { useAppTheme } from '@/constants/theme';
+import OfflineIndicator from '@/components/OfflineIndicator';
 
 // Ignore harmless Firebase connectivity warnings in development
 LogBox.ignoreLogs([
@@ -37,6 +39,7 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_800ExtraBold,
+    'PlusJakartaSans-Medium': PlusJakartaSans_500Medium,
   });
 
   const [showSplash, setShowSplash] = useState(true);
@@ -109,6 +112,9 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
       </Stack>
       <StatusBar style={isDark ? "light" : "dark"} />
+      <View pointerEvents="none" style={styles.offlineIndicator}>
+        <OfflineIndicator />
+      </View>
 
       {showSplash && (
         <Animated.View
@@ -131,10 +137,10 @@ export default function RootLayout() {
           <Animated.Text
             entering={FadeIn.delay(500).duration(800)}
             style={{
-              marginTop: 24,
-              fontSize: 34,
-              fontFamily: 'Inter_700Bold',
-              color: '#FFFFFF',
+              marginTop: 5,
+              fontSize: 30,
+              fontFamily: 'PlusJakartaSans-Medium',
+              color: '#ffffffff',
               letterSpacing: -0.5,
             }}
           >
@@ -149,5 +155,13 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
+  },
+  offlineIndicator: {
+    position: 'absolute',
+    top: 54,
+    left: 0,
+    right: 0,
+    zIndex: 100000,
+    alignItems: 'center',
   },
 });
