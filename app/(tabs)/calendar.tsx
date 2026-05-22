@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, Platform, StyleSheet, FlatList } from 'react-native';
-import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, FontWeight } from '../../constants/theme';
+import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, Platform, StyleSheet } from 'react-native';
+import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTasks } from '../../hooks/useTasks';
-import { router } from 'expo-router';
-import { format, parseISO } from 'date-fns';
+import { router, useLocalSearchParams } from 'expo-router';
+import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { parseTaskDate } from '../../utils/date';
@@ -15,7 +15,6 @@ import Animated, {
   useAnimatedStyle, 
   withRepeat, 
   withTiming, 
-  withSequence,
   interpolate,
   FadeIn
 } from 'react-native-reanimated';
@@ -80,6 +79,16 @@ export default function CalendarScreen() {
   const [showAddTask, setShowAddTask] = useState(false);
   
   const { tasks, isLoading, addTask } = useTasks();
+  const params = useLocalSearchParams();
+
+  // Open add task form if directed from the floating '+' tab button
+  React.useEffect(() => {
+    if (params.add === 'true') {
+      setShowAddTask(true);
+      // Clear the query parameter so it doesn't trigger again on subsequent renders
+      router.setParams({ add: undefined });
+    }
+  }, [params.add]);
 
   // Form state for new task
   const [taskTitle, setTaskTitle] = useState('');
@@ -99,6 +108,7 @@ export default function CalendarScreen() {
   const [waktuSelesaiDate, setWaktuSelesaiDate] = useState(new Date());
 
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
+  const canSaveTask = taskTitle.trim().length > 0;
 
   // Calculate marked dates for the calendar
   const markedDates = useMemo(() => {
@@ -205,7 +215,7 @@ const handleAddTask = async () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + Spacing.md }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Calendar Grid */}
         <View style={styles.calendarCard}>
           <Calendar
@@ -289,9 +299,9 @@ const handleAddTask = async () => {
               textDisabledColor: Colors.textMuted,
               arrowColor: Colors.brownDark,
               monthTextColor: Colors.textPrimary,
-              textDayFontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter_400Regular',
-              textMonthFontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter_700Bold',
-              textDayHeaderFontFamily: Platform.OS === 'ios' ? 'Inter' : 'Inter_500Medium',
+              textDayFontFamily: 'Poppins_400Regular',
+              textMonthFontFamily: 'Poppins_700Bold',
+              textDayHeaderFontFamily: 'Poppins_500Medium',
               textDayFontWeight: '400',
               textMonthFontWeight: '700',
               textDayHeaderFontWeight: '500',
@@ -314,24 +324,31 @@ const handleAddTask = async () => {
 
           {showAddTask && (
             <View style={styles.addTaskForm}>
-              <View style={styles.formDateBadge}>
-                <Ionicons name="calendar" size={16} color={Colors.brownDark} />
-                <Text style={styles.formDateBadgeText}>
-                  {format(selectedDate, 'EEEE, d MMMM yyyy', { locale: id })}
-                </Text>
+              <View style={styles.addTaskHeader}>
+                <View>
+                  <Text style={styles.formTitle}>Tambah Jadwal</Text>
+                  <Text style={styles.formSubtitle}>
+                    {format(selectedDate, 'EEEE, d MMMM yyyy', { locale: id })}
+                  </Text>
+                </View>
               </View>
+
               <View style={styles.nameIconRow}>
                 <View style={styles.nameField}>
-                  <Text style={styles.fieldLabel}>NAMA JADWAL</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Contoh: Meeting Pagi"
-                    value={taskTitle}
-                    onChangeText={setTaskTitle}
-                  />
+                  <Text style={styles.fieldLabel}>Nama jadwal</Text>
+                  <View style={styles.inputShell}>
+                    <Ionicons name="pencil-outline" size={18} color={Colors.textMuted} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Contoh: Belajar matematika"
+                      placeholderTextColor={Colors.textMuted}
+                      value={taskTitle}
+                      onChangeText={setTaskTitle}
+                    />
+                  </View>
                 </View>
                 <View style={styles.iconField}>
-                  <Text style={styles.fieldLabel}>IKON</Text>
+                  <Text style={styles.fieldLabel}>Ikon</Text>
                   <TouchableOpacity style={styles.iconTrigger} onPress={() => setShowIconPicker(true)}>
                     <Ionicons name={selectedIcon as any} size={20} color={Colors.brownDark} />
                     <Ionicons name="chevron-down" size={14} color={Colors.textMuted} />
@@ -339,68 +356,99 @@ const handleAddTask = async () => {
                 </View>
               </View>
 
-              <Text style={styles.fieldLabel}>DESKRIPSI (OPSIONAL)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Tambahkan detail..."
-                multiline
-                value={taskDesc}
-                onChangeText={setTaskDesc}
-              />
+              <Text style={styles.fieldLabel}>Catatan</Text>
+              <View style={[styles.inputShell, styles.textAreaShell]}>
+                <Ionicons name="document-text-outline" size={18} color={Colors.textMuted} style={styles.textAreaIcon} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Opsional"
+                  placeholderTextColor={Colors.textMuted}
+                  multiline
+                  value={taskDesc}
+                  onChangeText={setTaskDesc}
+                />
+              </View>
 
-              <Text style={styles.fieldLabel}>JENIS WAKTU</Text>
+              <View style={styles.timeSectionHeader}>
+                <Text style={styles.fieldLabel}>Waktu</Text>
+                <Text style={styles.fieldHint}>
+                  {timeType === 'schedule' ? 'Mulai dan selesai' : 'Batas waktu'}
+                </Text>
+              </View>
               <View style={styles.typeRow}>
-                <TouchableOpacity 
-                  style={[styles.typeBtn, timeType === 'target' && styles.typeBtnActive]} 
-                  onPress={() => setTimeType('target')}
-                >
-                  <Text style={[styles.typeBtnText, timeType === 'target' && styles.typeBtnTextActive]}>Target Waktu</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.typeBtn, timeType === 'schedule' && styles.typeBtnActive]} 
+                <TouchableOpacity
+                  style={[styles.typeBtn, timeType === 'schedule' && styles.typeBtnActive]}
                   onPress={() => setTimeType('schedule')}
                 >
-                  <Text style={[styles.typeBtnText, timeType === 'schedule' && styles.typeBtnTextActive]}>Waktu Terjadwal</Text>
+                  <Ionicons
+                    name="time-outline"
+                    size={17}
+                    color={timeType === 'schedule' ? Colors.white : Colors.textSecondary}
+                  />
+                  <Text style={[styles.typeBtnText, timeType === 'schedule' && styles.typeBtnTextActive]}>
+                    Ada jam mulai
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeBtn, timeType === 'target' && styles.typeBtnActive]}
+                  onPress={() => setTimeType('target')}
+                >
+                  <Ionicons
+                    name="flag-outline"
+                    size={17}
+                    color={timeType === 'target' ? Colors.white : Colors.textSecondary}
+                  />
+                  <Text style={[styles.typeBtnText, timeType === 'target' && styles.typeBtnTextActive]}>
+                    Deadline saja
+                  </Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.fieldLabel}>WAKTU</Text>
               {timeType === 'schedule' ? (
                 <View style={styles.timeRangeRow}>
                   <TouchableOpacity 
-                    style={[styles.datePickerBtn, { flex: 1 }]}
+                    style={styles.datePickerBtn}
                     onPress={() => setShowStartTimePicker(true)}
                   >
-                    <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
-                    <Text style={styles.datePickerText}>{waktuMulai}</Text>
+                    <Text style={styles.timePickerLabel}>Mulai</Text>
+                    <View style={styles.timeValueRow}>
+                      <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
+                      <Text style={styles.datePickerText}>{waktuMulai}</Text>
+                    </View>
                   </TouchableOpacity>
-                  
-                  <Text style={styles.timeSeparator}>-</Text>
-                  
+
                   <TouchableOpacity 
-                    style={[styles.datePickerBtn, { flex: 1 }]}
+                    style={styles.datePickerBtn}
                     onPress={() => setShowEndTimePicker(true)}
                   >
-                    <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
-                    <Text style={styles.datePickerText}>{waktuSelesai}</Text>
+                    <Text style={styles.timePickerLabel}>Selesai</Text>
+                    <View style={styles.timeValueRow}>
+                      <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
+                      <Text style={styles.datePickerText}>{waktuSelesai}</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.timeRangeRow}>
                   <TouchableOpacity 
-                    style={[styles.datePickerBtn, { flex: 1 }]}
+                    style={styles.datePickerBtn}
                     onPress={() => setShowTargetTimePicker(true)}
                   >
-                    <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
-                    <Text style={styles.datePickerText}>{targetTime}</Text>
+                    <Text style={styles.timePickerLabel}>Deadline</Text>
+                    <View style={styles.timeValueRow}>
+                      <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
+                      <Text style={styles.datePickerText}>{targetTime}</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               )}
 
               <TouchableOpacity 
-                style={[styles.saveBtn, { marginTop: Spacing.xl }]}
+                style={[styles.saveBtn, !canSaveTask && styles.saveBtnDisabled]}
                 onPress={handleAddTask}
+                disabled={!canSaveTask}
               >
+                <Ionicons name="checkmark-circle" size={20} color={Colors.white} />
                 <Text style={styles.saveBtnText}>Simpan Jadwal</Text>
               </TouchableOpacity>
             </View>
@@ -561,43 +609,144 @@ const getStyles = (Colors: any) => StyleSheet.create({
   },
   addTaskForm: {
     backgroundColor: Colors.beige,
-    padding: Spacing.lg,
-    borderRadius: Radius.xxl,
+    padding: Spacing.md,
+    borderRadius: Radius.xl,
     marginBottom: Spacing.xl,
     ...Shadow.sm,
   },
-  formDateBadge: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: sw(6), 
-    backgroundColor: Colors.inputBg, 
-    alignSelf: 'flex-start', 
-    paddingHorizontal: sw(12), 
-    paddingVertical: sw(6), 
-    borderRadius: Radius.full,
+  addTaskHeader: {
+    marginBottom: Spacing.lg,
+  },
+  formTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  formSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  nameIconRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
+  nameField: { flex: 1 },
+  iconField: { width: sw(82) },
+  fieldLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  fieldHint: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  sectionLabel: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  inputShell: {
+    minHeight: sw(50),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+    paddingHorizontal: Spacing.md,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: sw(12),
+    fontSize: FontSize.md,
+    color: Colors.textPrimary,
+  },
+  textAreaShell: {
+    minHeight: sw(84),
+    alignItems: 'flex-start',
+    paddingTop: sw(12),
     marginBottom: Spacing.md,
+  },
+  textArea: {
+    minHeight: sw(62),
+    paddingTop: 0,
+    textAlignVertical: 'top',
+  },
+  textAreaIcon: {
+    marginTop: sw(2),
+  },
+  iconTrigger: {
+    height: sw(50),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: sw(6),
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     borderColor: Colors.inputBorder,
   },
-  formDateBadgeText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary },
-  nameIconRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.sm },
-  nameField: { flex: 1 },
-  iconField: { width: sw(90) },
-  fieldLabel: { fontSize: FontSize.xxs, fontWeight: '700', color: Colors.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.md, letterSpacing: 1 },
-  sectionLabel: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
-  input: { backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(12), fontSize: FontSize.md, color: Colors.textPrimary },
-  textArea: { minHeight: sw(80), paddingTop: Spacing.md },
-  iconTrigger: { flexDirection: 'row', alignItems: 'center', gap: sw(4), backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(10) },
-  datePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md, paddingVertical: sw(14) },
+  datePickerBtn: {
+    flex: 1,
+    minHeight: sw(70),
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: sw(10),
+    justifyContent: 'center',
+  },
+  timePickerLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    fontWeight: '700',
+    marginBottom: Spacing.xs,
+  },
+  timeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   datePickerText: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '600' },
-  typeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
-  typeBtn: { flex: 1, paddingVertical: sw(10), alignItems: 'center', backgroundColor: Colors.inputBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.inputBorder },
+  timeSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+  },
+  typeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  typeBtn: {
+    flex: 1,
+    minHeight: sw(46),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: sw(6),
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: sw(10),
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+  },
   typeBtnActive: { backgroundColor: Colors.brownDark, borderColor: Colors.brownDark },
   typeBtnText: { fontSize: FontSize.sm, color: Colors.textPrimary, fontWeight: '600' },
   typeBtnTextActive: { color: Colors.white },
   timeRangeRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  timeSeparator: { fontSize: FontSize.lg, color: Colors.textSecondary, fontWeight: '600' },
-  saveBtn: { backgroundColor: Colors.brownDark, borderRadius: Radius.xl, paddingVertical: sw(14), alignItems: 'center', ...Shadow.sm },
+  saveBtn: {
+    minHeight: sw(52),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.brownDark,
+    borderRadius: Radius.xl,
+    marginTop: Spacing.lg,
+    paddingVertical: sw(14),
+    ...Shadow.sm,
+  },
+  saveBtnDisabled: {
+    opacity: 0.45,
+  },
   saveBtnText: { color: Colors.white, fontSize: FontSize.md, fontWeight: '700' },
   taskItem: { flexDirection: 'row', marginBottom: Spacing.md },
   taskTime: { width: sw(60), paddingTop: sw(4) },
@@ -681,4 +830,3 @@ const getStyles = (Colors: any) => StyleSheet.create({
     marginTop: sw(2),
   },
 });
-

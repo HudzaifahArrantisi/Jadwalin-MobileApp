@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, RefreshControl, FlatList, Modal, Platform, Alert
+  Image, RefreshControl, FlatList, Modal, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -19,6 +19,7 @@ import { Task } from '@/types/task.types';
 import { parseTaskDate } from '@/utils/date';
 import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH, getTaskCardColor, TASK_CARD_COLORS } from '@/constants/theme';
 import InteractivePressable from '@/components/InteractivePressable';
+import { useHabitStore } from '@/store/habitStore';
 
 const formatLocalDate = (d: Date) => {
   const y = d.getFullYear();
@@ -91,6 +92,9 @@ function formatDateIndonesian(date: Date): { dayMonth: string, year: string } {
     year: `${date.getFullYear()}`
   };
 }
+
+
+
 
 // ─── Horizontal Calendar Day Item ───
 function CalendarDayItem({
@@ -423,7 +427,7 @@ function DeleteTaskModal({
           </View>
 
           <Text style={styles.customModalDesc}>
-            Apakah kamu yakin ingin menghapus jadwal <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>"{taskTitle}"</Text>? Tindakan ini tidak dapat dibatalkan.
+            Apakah kamu yakin ingin menghapus jadwal <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>&quot;{taskTitle}&quot;</Text>? Tindakan ini tidak dapat dibatalkan.
           </Text>
 
           <View style={styles.modalButtonsRow}>
@@ -558,10 +562,83 @@ function MiniCalendarDropdown({
   );
 }
 
+// ─── Progress Ring (Pure View, no SVG needed) ───
+function ProgressRing({ 
+  percentage, size = sw(42), strokeWidth = sw(4) 
+}: { 
+  percentage: number; size?: number; strokeWidth?: number 
+}) {
+  const { Colors, isDark } = useAppTheme();
+  const clampedPct = Math.min(100, Math.max(0, percentage));
+
+  // We approximate a ring using 2 half-circle overlays
+  const radius = size / 2;
+  const rotation1 = Math.min(clampedPct, 50) * 3.6; // 0-180deg for first half
+  const rotation2 = Math.max(0, clampedPct - 50) * 3.6; // 0-180deg for second half
+  const trackColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(139,115,85,0.1)';
+  const fillColor = Colors.brownDark;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Background track */}
+      <View style={{
+        position: 'absolute', width: size, height: size, borderRadius: radius,
+        borderWidth: strokeWidth, borderColor: trackColor,
+      }} />
+      {/* Right half (0-50%) */}
+      <View style={{
+        position: 'absolute', width: size, height: size,
+        overflow: 'hidden',
+      }}>
+        <View style={{
+          position: 'absolute', width: size / 2, height: size,
+          right: 0, overflow: 'hidden',
+        }}>
+          <View style={{
+            width: size, height: size, borderRadius: radius,
+            borderWidth: strokeWidth, borderColor: fillColor,
+            borderLeftColor: 'transparent', borderBottomColor: 'transparent',
+            transform: [{ rotate: `${rotation1 - 45}deg` }],
+            position: 'absolute', right: 0,
+          }} />
+        </View>
+      </View>
+      {/* Left half (50-100%) */}
+      {clampedPct > 50 && (
+        <View style={{
+          position: 'absolute', width: size, height: size,
+          overflow: 'hidden',
+        }}>
+          <View style={{
+            position: 'absolute', width: size / 2, height: size,
+            left: 0, overflow: 'hidden',
+          }}>
+            <View style={{
+              width: size, height: size, borderRadius: radius,
+              borderWidth: strokeWidth, borderColor: fillColor,
+              borderRightColor: 'transparent', borderTopColor: 'transparent',
+              transform: [{ rotate: `${rotation2 - 45}deg` }],
+              position: 'absolute', left: 0,
+            }} />
+          </View>
+        </View>
+      )}
+      {/* Center label */}
+      <Text style={{
+        fontSize: FontSize.xxs,
+        fontWeight: '800',
+        color: Colors.brownDark,
+      }}>
+        {Math.round(clampedPct)}%
+      </Text>
+    </View>
+  );
+}
+
 // ─── Main Home Screen ───
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { tasks, toggleStatus, removeTask } = useTasks();
+  const { tasks, toggleStatus, removeTask, addTask } = useTasks();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { Colors, isDark } = useAppTheme();
@@ -575,6 +652,43 @@ export default function HomeScreen() {
   const [isWeeklyListVisible, setIsWeeklyListVisible] = useState(true);
   const [toasts, setToasts] = useState<{ id: string, message: string }[]>([]);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+
+
+  // ── Feature 3: Quick-Add Task ──
+  const [quickAddText, setQuickAddText] = useState('');
+  const quickAddInputFocused = useSharedValue(0);
+  const quickAddAnimStyle = useAnimatedStyle(() => ({
+    borderColor: withTiming(
+      quickAddInputFocused.value ? '#8B5CF6' : 'transparent',
+      { duration: 200 }
+    ),
+    transform: [{ scale: withSpring(quickAddInputFocused.value ? 1.01 : 1, { damping: 15 }) }],
+  }));
+
+  const handleQuickAdd = useCallback(async () => {
+    const title = quickAddText.trim();
+    if (!title) return;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await addTask({
+        title,
+        description: '',
+        date: new Date(selectedDate + 'T00:00:00'),
+        showOnWidget: false,
+        reminder: false,
+        reminderDays: [],
+      });
+      setQuickAddText('');
+      triggerToast('Jadwal ditambahkan ✨');
+    } catch (err) {
+      console.warn('[QuickAdd] Error:', err);
+    }
+  }, [quickAddText, selectedDate, addTask]);
+
+  // ── Feature 4: Habit Tracker ──
+  const { habits, toggleHabit, isHabitDone } = useHabitStore();
+
+
 
   const triggerToast = useCallback((message: string) => {
     const id = Math.random().toString(36).substring(7);
@@ -631,6 +745,13 @@ export default function HomeScreen() {
       return d && d >= monday && d <= sunday && t.status !== 'completed';
     }).length;
   }, [tasks, today]);
+
+  // ── Feature 2: Weekly Progress Percentage ──
+  const weeklyProgress = useMemo(() => {
+    if (weekTasks.length === 0) return 0;
+    const completed = weekTasks.filter((t) => t.status === 'completed').length;
+    return (completed / weekTasks.length) * 100;
+  }, [weekTasks]);
 
   const selectedDayLabel = isSelectedToday ? 'Hari ini' : (() => {
     const d = new Date(selectedDate + 'T00:00:00');
@@ -705,20 +826,24 @@ export default function HomeScreen() {
               <Text style={styles.miniStatsValue}>{tasksThisWeek}</Text>
               <Text style={styles.miniStatsLabel}>Kegiatan Minggu ini</Text>
             </View>
-          </View>
+        </View>
         </InteractivePressable>
-        <InteractivePressable
-          onPress={() => router.push('/(tabs)/settings')}
-          hapticType={Haptics.ImpactFeedbackStyle.Light}
-        >
-          {user?.photoURL ? (
-            <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={sw(24)} color={Colors.white} />
-            </View>
-          )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sw(10) }}>
+          {/* Feature 2: Weekly Progress Ring */}
+          <ProgressRing percentage={weeklyProgress} />
+          <InteractivePressable
+            onPress={() => router.push('/(tabs)/settings')}
+            hapticType={Haptics.ImpactFeedbackStyle.Light}
+          >
+            {user?.photoURL ? (
+              <Image source={{ uri: user.photoURL }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={sw(24)} color={Colors.white} />
+              </View>
+            )}
         </InteractivePressable>
+        </View>
       </View>
 
       {/* ── Horizontal Week Calendar ── */}
@@ -754,12 +879,33 @@ export default function HomeScreen() {
       >
 
 
-
         {/* ── Daily Activities Section (Brown Card) ── */}
         <Animated.View entering={FadeInDown.delay(200).duration(600).springify()} style={styles.dailySection}>
           <View style={styles.dailyHeader}>
             <Text style={styles.dailyHeaderText}>{selectedDayLabel}</Text>
           </View>
+
+          {/* Feature 3: Quick-Add Task Inline */}
+          <Animated.View style={[styles.quickAddContainer, quickAddAnimStyle]}>
+            <TextInput
+              style={styles.quickAddInput}
+              placeholder="Tulis tugas baru hari ini..."
+              placeholderTextColor={Colors.textMuted}
+              value={quickAddText}
+              onChangeText={setQuickAddText}
+              onFocus={() => { quickAddInputFocused.value = 1; }}
+              onBlur={() => { quickAddInputFocused.value = 0; }}
+              onSubmitEditing={handleQuickAdd}
+              returnKeyType="done"
+            />
+            <InteractivePressable
+              style={styles.quickAddBtn}
+              onPress={handleQuickAdd}
+              hapticType={Haptics.ImpactFeedbackStyle.Light}
+            >
+              <Ionicons name="add" size={sw(20)} color={Colors.white} />
+            </InteractivePressable>
+          </Animated.View>
 
           {selectedDayTasks.length > 0 ? (
             <View style={styles.dailyList}>
@@ -824,6 +970,33 @@ export default function HomeScreen() {
             )
           )}
         </Animated.View>
+
+        {/* ── Feature 4: Habit Tracker Mini ── */}
+        <Animated.View entering={FadeInDown.delay(350).duration(600).springify()} style={styles.habitSection}>
+          <Text style={styles.habitSectionTitle}>Kebiasaan Harian</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScrollContent}>
+            {habits.map((habit) => {
+              const done = isHabitDone(habit.id, selectedDate);
+              return (
+                <InteractivePressable
+                  key={habit.id}
+                  style={[styles.habitCapsule, done && styles.habitCapsuleDone]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    toggleHabit(habit.id, selectedDate);
+                  }}
+                  hapticType={Haptics.ImpactFeedbackStyle.Medium}
+                >
+                  <Text style={styles.habitIcon}>{habit.icon}</Text>
+                  <Text style={[styles.habitLabel, done && styles.habitLabelDone]}>{habit.name}</Text>
+                  {done && <Ionicons name="checkmark-circle" size={sw(16)} color={Colors.white} style={{ marginLeft: sw(4) }} />}
+                </InteractivePressable>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+
+
 
         <View style={{ height: sw(120) }} />
       </ScrollView>
@@ -1282,4 +1455,79 @@ const getStyles = (Colors: any, isDark: boolean) => StyleSheet.create({
   modalDaySelected: { backgroundColor: Colors.brownDark },
   modalDayText: { fontSize: FontSize.sm, color: Colors.textPrimary },
   modalTaskDot: { width: sw(4), height: sw(4), borderRadius: sw(2), backgroundColor: Colors.brown, marginTop: sw(2) },
+
+
+  // ── Feature 3: Quick-Add Task ──
+  quickAddContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(139,115,85,0.06)',
+    borderRadius: Radius.xl,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: sw(4),
+    marginBottom: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  quickAddInput: {
+    flex: 1,
+    fontSize: FontSize.md,
+    fontWeight: '500',
+    color: Colors.textPrimary,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: sw(10),
+  },
+  quickAddBtn: {
+    width: sw(36),
+    height: sw(36),
+    borderRadius: sw(18),
+    backgroundColor: Colors.brownDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.sm,
+  },
+
+  // ── Feature 4: Habit Tracker ──
+  habitSection: {
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  habitSectionTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  habitScrollContent: {
+    gap: sw(8),
+    paddingRight: Spacing.md,
+  },
+  habitCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: sw(10),
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    borderColor: isDark ? 'rgba(255,255,255,0.12)' : Colors.inputBorder,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : Colors.beige,
+  },
+  habitCapsuleDone: {
+    backgroundColor: Colors.brownDark,
+    borderColor: Colors.brownDark,
+  },
+  habitIcon: {
+    fontSize: sw(16),
+    marginRight: sw(6),
+  },
+  habitLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  habitLabelDone: {
+    color: Colors.white,
+  },
+
+
 });

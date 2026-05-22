@@ -3,8 +3,18 @@ import { View, StyleSheet, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
-import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans';
+import { 
+  useFonts, 
+  Poppins_300Light,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold 
+} from '@expo-google-fonts/poppins';
+import { Text, TextInput } from 'react-native';
+import React from 'react';
+
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -14,7 +24,67 @@ import { requestNotificationPermission } from '@/services/notification.service';
 import { useAppTheme } from '@/constants/theme';
 import OfflineIndicator from '@/components/OfflineIndicator';
 
+// Map font weights to Poppins
+const mapFontWeightToPoppins = (style: any) => {
+  if (!style) return 'Poppins_400Regular';
+  const flat = StyleSheet.flatten(style);
+  if (!flat) return 'Poppins_400Regular';
+
+  // If a custom fontFamily is specified (e.g. Ionicons or custom icons), do not override it
+  if (flat.fontFamily && 
+      flat.fontFamily !== 'Inter' && 
+      flat.fontFamily !== 'Inter_400Regular' && 
+      flat.fontFamily !== 'Inter_700Bold' && 
+      flat.fontFamily !== 'Inter_500Medium' && 
+      flat.fontFamily !== 'PlusJakartaSans-Medium') {
+    return flat.fontFamily;
+  }
+
+  const weight = flat.fontWeight;
+  if (weight === 'bold' || weight === '700') {
+    return 'Poppins_700Bold';
+  }
+  if (weight === '800' || weight === '900') {
+    return 'Poppins_800ExtraBold';
+  }
+  if (weight === '600') {
+    return 'Poppins_600SemiBold';
+  }
+  if (weight === '500') {
+    return 'Poppins_500Medium';
+  }
+  if (weight === '300' || weight === '200' || weight === '100') {
+    return 'Poppins_300Light';
+  }
+  return 'Poppins_400Regular';
+};
+
+// Global text patch for Poppins font family
+if ((Text as any).render) {
+  const oldTextRender = (Text as any).render;
+  (Text as any).render = function (...args: any[]) {
+    const origin = oldTextRender.apply(this, args);
+    const fontFamily = mapFontWeightToPoppins(origin.props.style);
+    return React.cloneElement(origin, {
+      style: [origin.props.style, { fontFamily }],
+    });
+  };
+}
+
+// Global text input patch for Poppins font family
+if ((TextInput as any).render) {
+  const oldTextInputRender = (TextInput as any).render;
+  (TextInput as any).render = function (...args: any[]) {
+    const origin = oldTextInputRender.apply(this, args);
+    const fontFamily = mapFontWeightToPoppins(origin.props.style);
+    return React.cloneElement(origin, {
+      style: [origin.props.style, { fontFamily }],
+    });
+  };
+}
+
 // Ignore harmless Firebase connectivity warnings in development
+
 LogBox.ignoreLogs([
   'WebChannelConnection RPC',
   'BloomFilter error',
@@ -32,15 +102,23 @@ export default function RootLayout() {
 
   const [appReady, setAppReady] = useState(false);
 
-  // Load Inter font family
+  // Load Poppins font family
   const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-    'PlusJakartaSans-Medium': PlusJakartaSans_500Medium,
+    Poppins_300Light,
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
+    // Aliases to avoid breaking legacy code targeting these specific names
+    'PlusJakartaSans-Medium': Poppins_500Medium,
+    'Inter_400Regular': Poppins_400Regular,
+    'Inter_500Medium': Poppins_500Medium,
+    'Inter_600SemiBold': Poppins_600SemiBold,
+    'Inter_700Bold': Poppins_700Bold,
+    'Inter_800ExtraBold': Poppins_800ExtraBold,
   });
+
 
   const [showSplash, setShowSplash] = useState(true);
 
@@ -139,7 +217,7 @@ export default function RootLayout() {
             style={{
               marginTop: 5,
               fontSize: 30,
-              fontFamily: 'PlusJakartaSans-Medium',
+              fontFamily: 'Poppins_500Medium',
               color: '#ffffffff',
               letterSpacing: -0.5,
             }}
