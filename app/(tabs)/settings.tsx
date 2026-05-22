@@ -303,7 +303,7 @@ export default function ProfileScreen() {
               <View style={styles.logoutIconWrapper}>
                 <Ionicons name="log-out-outline" size={sw(22)} color={Colors.danger} />
               </View>
-              <Text style={styles.logoutText}>Keluar dari Akun</Text>
+              <Text style={styles.logoutText}>Keluar akun</Text>
               <Ionicons name="chevron-forward" size={sw(18)} color={Colors.textMuted} />
             </InteractivePressable>
           </Animated.View>

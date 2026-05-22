@@ -57,7 +57,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             ? 'Jadwal' 
             : route.name === 'notes' 
             ? 'Catatan' 
-            : 'Profil';
+            : 'profile';
 
           return (
             <TouchableOpacity
