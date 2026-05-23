@@ -88,6 +88,7 @@ if ((TextInput as any).render) {
 LogBox.ignoreLogs([
   'WebChannelConnection RPC',
   'BloomFilter error',
+  'expo-notifications: Android Push notifications',
 ]);
 
 // Keep splash visible while loading

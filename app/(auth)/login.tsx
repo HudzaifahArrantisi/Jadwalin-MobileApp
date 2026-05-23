@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, TextInput, ScrollView,
-  Dimensions,
+  Dimensions, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -38,6 +38,17 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  // Custom Error Modal State
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('Gagal');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const showError = (message: string, title = 'Gagal') => {
+    setErrorMessage(message);
+    setErrorTitle(title);
+    setErrorModalVisible(true);
+  };
+
   const buttonScale = useSharedValue(1);
 
   const btnAnim = useAnimatedStyle(() => ({
@@ -59,7 +70,7 @@ export default function LoginScreen() {
         handleGoogleCredential(id_token);
       }
     } else if (response?.type === 'error') {
-      Alert.alert('Google Sign-In Gagal', response.error?.message || 'Terjadi kesalahan');
+      showError(response.error?.message || 'Terjadi kesalahan', 'Google Sign-In Gagal');
       setIsGoogleLoading(false);
     } else if (response?.type === 'dismiss') {
       setIsGoogleLoading(false);
@@ -72,7 +83,7 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Firebase Google Sign-In error:', error);
-      Alert.alert('Google Sign-In Gagal', error.message || 'Terjadi kesalahan saat sign-in dengan Google.');
+      showError(error.message || 'Terjadi kesalahan saat sign-in dengan Google.', 'Google Sign-In Gagal');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -83,18 +94,18 @@ export default function LoginScreen() {
     try {
       await promptAsync();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Tidak dapat memulai Google Sign-In');
+      showError(error.message || 'Tidak dapat memulai Google Sign-In', 'Error');
       setIsGoogleLoading(false);
     }
   };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Email dan password wajib diisi');
+      showError('Email dan password wajib diisi', 'Input Tidak Lengkap');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password minimal 6 karakter');
+      showError('Password minimal 6 karakter', 'Password Terlalu Pendek');
       return;
     }
 
@@ -103,12 +114,19 @@ export default function LoginScreen() {
       await signInWithEmail(email.trim(), password);
       router.replace('/(tabs)');
     } catch (error: any) {
-      let message = 'Terjadi kesalahan';
-      if (error.code === 'auth/invalid-email') message = 'Email tidak valid';
-      else if (error.code === 'auth/user-not-found') message = 'Akun tidak ditemukan';
-      else if (error.code === 'auth/wrong-password') message = 'Password salah';
-      else if (error.code === 'auth/invalid-credential') message = 'Email atau password salah';
-      Alert.alert('Login Gagal', message);
+      let message = 'Terjadi kesalahan. Silakan coba lagi.';
+      if (error.code === 'auth/invalid-email') {
+        message = 'Format email tidak valid.';
+      } else if (
+        error.code === 'auth/user-not-found' ||
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        message = 'Email atau password salah. Coba lagi.';
+      } else {
+        message = error.message || 'Terjadi kesalahan.';
+      }
+      showError(message, 'Login Gagal');
     } finally {
       setIsLoading(false);
     }
@@ -223,6 +241,34 @@ export default function LoginScreen() {
         <View style={styles.bottomWaveCurveBg} />
         <View style={styles.bottomWaveCurveFg} />
       </View>
+
+      {/* Custom Error Popup Modal */}
+      <Modal
+        visible={errorModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setErrorModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View 
+            entering={FadeInDown.duration(300).springify()}
+            style={styles.modalContent}
+          >
+            <View style={styles.errorIconContainer}>
+              <Ionicons name="alert-circle-outline" size={sw(32)} color="#EF4444" />
+            </View>
+            <Text style={styles.modalTitle}>{errorTitle}</Text>
+            <Text style={styles.modalMessage}>{errorMessage}</Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setErrorModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalButtonText}>Coba Lagi</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -379,5 +425,56 @@ const getStyles = (Colors: any, PURPLE: string, LIGHT_PURPLE: string) => StyleSh
     fontSize: FontSize.md,
     fontWeight: 'bold',
     textDecorationLine: 'underline',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: sw(320),
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    ...Shadow.lg,
+  },
+  errorIconContainer: {
+    width: sw(64),
+    height: sw(64),
+    borderRadius: sw(32),
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: Spacing.xs,
+  },
+  modalMessage: {
+    fontSize: FontSize.md,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: sw(20),
+  },
+  modalButton: {
+    width: '100%',
+    height: sw(48),
+    backgroundColor: PURPLE,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: Colors.white,
+    fontSize: FontSize.md,
+    fontWeight: 'bold',
   },
 });

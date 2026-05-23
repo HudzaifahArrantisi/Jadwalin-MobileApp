@@ -19,7 +19,6 @@ import { Task } from '@/types/task.types';
 import { parseTaskDate } from '@/utils/date';
 import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw, sh, SCREEN_WIDTH, getTaskCardColor, TASK_CARD_COLORS } from '@/constants/theme';
 import InteractivePressable from '@/components/InteractivePressable';
-import { useHabitStore } from '@/store/habitStore';
 
 const formatLocalDate = (d: Date) => {
   const y = d.getFullYear();
@@ -685,11 +684,6 @@ export default function HomeScreen() {
     }
   }, [quickAddText, selectedDate, addTask]);
 
-  // ── Feature 4: Habit Tracker ──
-  const { habits, toggleHabit, isHabitDone } = useHabitStore();
-
-
-
   const triggerToast = useCallback((message: string) => {
     const id = Math.random().toString(36).substring(7);
     setToasts((prev) => [...prev, { id, message }]);
@@ -970,33 +964,6 @@ export default function HomeScreen() {
             )
           )}
         </Animated.View>
-
-        {/* ── Feature 4: Habit Tracker Mini ── */}
-        <Animated.View entering={FadeInDown.delay(350).duration(600).springify()} style={styles.habitSection}>
-          <Text style={styles.habitSectionTitle}>Kebiasaan Harian</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.habitScrollContent}>
-            {habits.map((habit) => {
-              const done = isHabitDone(habit.id, selectedDate);
-              return (
-                <InteractivePressable
-                  key={habit.id}
-                  style={[styles.habitCapsule, done && styles.habitCapsuleDone]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    toggleHabit(habit.id, selectedDate);
-                  }}
-                  hapticType={Haptics.ImpactFeedbackStyle.Medium}
-                >
-                  <Text style={styles.habitIcon}>{habit.icon}</Text>
-                  <Text style={[styles.habitLabel, done && styles.habitLabelDone]}>{habit.name}</Text>
-                  {done && <Ionicons name="checkmark-circle" size={sw(16)} color={Colors.white} style={{ marginLeft: sw(4) }} />}
-                </InteractivePressable>
-              );
-            })}
-          </ScrollView>
-        </Animated.View>
-
-
 
         <View style={{ height: sw(120) }} />
       </ScrollView>
