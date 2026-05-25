@@ -201,12 +201,12 @@ export async function syncWidgetData(tasks: Task[]): Promise<void> {
           console.log(
             `[Widget] ✅ Synced ${widgetData.tasks.length} tasks for widget (week: ${widgetData.weekLabel})`
           );
-        } else {
-          console.log('[Widget] JadwalinWidgetModule.updateWidgetData not found');
         }
       } catch (e) {
-        // Native module not yet available (e.g. running in Expo Go)
-        console.log('[Widget] Native module not available, skipping native sync:', e);
+        // Native module is unavailable in Expo Go and some dev builds.
+        if (!__DEV__) {
+          console.warn('[Widget] Native module sync failed:', e);
+        }
       }
     }
   } catch (error) {

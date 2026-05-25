@@ -275,6 +275,11 @@ export interface TaskStore {
   setNotificationsEnabled: (enabled: boolean) => void;
   setOffline: (offline: boolean) => void;
   setHasSeenOnboarding: (seen: boolean) => void;
+
+  // Toast State
+  toast: { message: string; type: 'success' | 'info' | 'warning' } | null;
+  showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
+  hideToast: () => void;
 }
 
 // ───── Navigation ─────

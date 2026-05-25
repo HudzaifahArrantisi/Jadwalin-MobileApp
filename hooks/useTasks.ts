@@ -17,6 +17,7 @@ import {
   rescheduleTaskReminders,
 } from '@/services/notification.service';
 import { syncWidgetData } from '@/services/widget.service';
+import { awardTaskPoints } from '@/services/gamification.service';
 import {
   Task,
   CreateTaskInput,
@@ -36,6 +37,7 @@ export function useTasks() {
     setLoading,
     setError,
     setOffline,
+    showToast,
   } = useTaskStore();
 
   // Subscribe to realtime updates + auto-sync widget
@@ -104,13 +106,14 @@ export function useTasks() {
         if (notificationsEnabled && input.reminder) {
           await scheduleTaskReminders(task);
         }
+        showToast(`${task.title} ditambahkan`, 'success');
         return task;
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    [user?.uid, notificationsEnabled]
+    [user?.uid, notificationsEnabled, showToast]
   );
 
   const editTask = useCallback(
@@ -175,13 +178,32 @@ export function useTasks() {
             await scheduleTaskReminders(task);
           }
         }
+
+        const task = tasks.find((t) => t.id === taskId);
+        if (task) {
+          if (newStatus === 'completed') {
+            showToast(`${task.title} selesai`, 'success');
+            // Award gamification points (fire-and-forget, never blocks UI)
+            awardTaskPoints(
+              user.uid,
+              task,
+              user.name || '',
+              user.photoURL || null
+            ).catch((err) => {
+              console.warn('[useTasks] Gamification award failed:', err);
+            });
+          } else {
+            showToast(`${task.title} belum selesai`, 'info');
+          }
+        }
+
         return newStatus;
       } catch (err: any) {
         setError(err.message);
         throw err;
       }
     },
-    [user?.uid, tasks, notificationsEnabled]
+    [user?.uid, tasks, notificationsEnabled, showToast]
   );
 
   // ──── Stats ────

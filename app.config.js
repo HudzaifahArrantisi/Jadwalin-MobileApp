@@ -9,6 +9,7 @@ module.exports = {
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
+    googleServicesFile: "./GoogleService-Info.plist",
   },
   android: {
     googleServicesFile: "./google-services.json",
@@ -37,6 +38,9 @@ module.exports = {
         dark: {
           backgroundColor: "#6A3DE8",
         },
+        android: {
+          image: "./assets/images/splash-icon.png",
+        },
       },
     ],
     "@react-native-community/datetimepicker",
@@ -52,7 +56,6 @@ module.exports = {
         },
       },
     ],
-    // "@react-native-google-signin/google-signin" — replaced by expo-auth-session
     "./plugins/withJadwalinWidget",
   ],
   experiments: {
@@ -67,4 +70,3 @@ module.exports = {
   },
   owner: "candalena",
 };
-

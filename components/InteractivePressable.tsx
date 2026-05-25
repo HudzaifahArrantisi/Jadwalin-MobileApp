@@ -4,7 +4,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -19,7 +18,7 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 
 export default function InteractivePressable({
   children,
-  scaleTo = 0.96,
+  scaleTo = 0.98,
   hapticType = Haptics.ImpactFeedbackStyle.Light,
   onPress,
   style,
@@ -33,7 +32,7 @@ export default function InteractivePressable({
   }));
 
   const handlePressIn = () => {
-    scale.value = withTiming(scaleTo, { duration: 100 });
+    scale.value = withSpring(scaleTo, { damping: 14, stiffness: 260 });
   };
 
   const handlePressOut = () => {

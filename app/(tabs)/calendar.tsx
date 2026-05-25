@@ -1,832 +1,467 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, TextInput, Platform, StyleSheet } from 'react-native';
-import { useAppTheme, Spacing, FontSize, Radius, Shadow, sw } from '../../constants/theme';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Modal, KeyboardAvoidingView, Platform, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useTasks } from '../../hooks/useTasks';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
-import { parseTaskDate } from '../../utils/date';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withRepeat, 
-  withTiming, 
-  interpolate,
-  FadeIn
-} from 'react-native-reanimated';
+import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { useTasks } from '@/hooks/useTasks';
+import { Task } from '@/types/task.types';
+import { parseTaskDate } from '@/utils/date';
+import { useAppTheme, Spacing, FontSize, Radius, sw, getTaskCardColor } from '@/constants/theme';
+import InteractivePressable from '@/components/InteractivePressable';
+import TimePicker from '../../components/TimePicker';
 
-// ─── Today Pulse Indicator ───
-function TodayIndicator() {
-  const { Colors } = useAppTheme();
-  const pulse = useSharedValue(0);
+const DAY_NAMES = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
-  React.useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1, { duration: 1500 }),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pulse.value, [0, 1], [0.8, 1.2]) }],
-    opacity: interpolate(pulse.value, [0, 1], [0.3, 0.1]),
-  }));
-
-  return (
-    <Animated.View 
-      style={[
-        {
-          position: 'absolute',
-          width: sw(36),
-          height: sw(36),
-          borderRadius: sw(18),
-          backgroundColor: Colors.brownDark,
-          zIndex: -1,
-        },
-        animatedStyle
-      ]} 
-    />
-  );
-}
-
-// Configure Calendar Locale
-LocaleConfig.locales['id'] = {
-  monthNames: ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'],
-  monthNamesShort: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-  dayNames: ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
-  dayNamesShort: ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
-  today: 'Hari ini'
+const toKey = (date: Date) => format(date, 'yyyy-MM-dd');
+const sameDate = (date: Date, taskDate: any) => {
+  const parsed = parseTaskDate(taskDate);
+  return parsed ? toKey(parsed) === toKey(date) : false;
 };
-LocaleConfig.defaultLocale = 'id';
 
-const AVAILABLE_ICONS = [
-  'calendar', 'briefcase', 'videocam', 'call', 'book',
-  'restaurant', 'cafe', 'car', 'airplane', 'desktop',
-  'fitness', 'musical-notes', 'cart', 'heart', 'star',
-  'school', 'barbell', 'alarm', 'brush', 'build'
-];
+const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
-export default function CalendarScreen() {
-  const { Colors, isDark } = useAppTheme();
-  const styles = useMemo(() => getStyles(Colors), [Colors]);
-  const insets = useSafeAreaInsets();
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showAddTask, setShowAddTask] = useState(false);
-  
-  const { tasks, isLoading, addTask } = useTasks();
-  const params = useLocalSearchParams();
+const addMonths = (date: Date, amount: number) => {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + amount);
+  next.setDate(1);
+  return next;
+};
 
-  // Open add task form if directed from the floating '+' tab button
-  React.useEffect(() => {
-    if (params.add === 'true') {
-      setShowAddTask(true);
-      // Clear the query parameter so it doesn't trigger again on subsequent renders
-      router.setParams({ add: undefined });
-    }
-  }, [params.add]);
-
-  // Form state for new task
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDesc, setTaskDesc] = useState('');
-  const [timeType, setTimeType] = useState<'target' | 'schedule'>('schedule');
-  const [targetTime, setTargetTime] = useState('19.00');
-  const [waktuMulai, setWaktuMulai] = useState('19.00');
-  const [waktuSelesai, setWaktuSelesai] = useState('21.00');
-  const [selectedIcon, setSelectedIcon] = useState('calendar');
-  
-  const [showTargetTimePicker, setShowTargetTimePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [showIconPicker, setShowIconPicker] = useState(false);
-  const [targetTimeDate, setTargetTimeDate] = useState(new Date());
-  const [waktuMulaiDate, setWaktuMulaiDate] = useState(new Date());
-  const [waktuSelesaiDate, setWaktuSelesaiDate] = useState(new Date());
-
-  const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
-  const canSaveTask = taskTitle.trim().length > 0;
-
-  // Calculate marked dates for the calendar
-  const markedDates = useMemo(() => {
-    const marks: any = {};
-    const todayDate = new Date();
-    todayDate.setHours(0,0,0,0);
-    
-    // Mark tasks
-    tasks.forEach(task => {
-      const d = parseTaskDate(task.date);
-      if (d) {
-        const dateStr = format(d, 'yyyy-MM-dd');
-        if (!marks[dateStr]) {
-          marks[dateStr] = { marked: true, icons: [], isPast: false };
-        }
-        if (marks[dateStr].icons.length < 3) {
-          marks[dateStr].icons.push(task.icon || 'calendar');
-        }
-      }
-    });
-
-    // Mark selected date
-    if (!marks[selectedDateString]) {
-      marks[selectedDateString] = { icons: [], isPast: false };
-    }
-    marks[selectedDateString].selected = true;
-
-    // Mark past days with purple progress bullet
-    const currentMonth = selectedDate.getMonth();
-    const currentYear = selectedDate.getFullYear();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    for (let i = 1; i <= daysInMonth; i++) {
-      const d = new Date(currentYear, currentMonth, i);
-      d.setHours(0,0,0,0);
-      const dateStr = format(d, 'yyyy-MM-dd');
-      if (d < todayDate) {
-        if (!marks[dateStr]) marks[dateStr] = { icons: [] };
-        marks[dateStr].isPast = true;
-      }
-    }
-
-    return marks;
-  }, [tasks, selectedDateString, selectedDate]);
-
-const handleAddTask = async () => {
-  if (!taskTitle.trim()) return;
-  
-  await addTask({
-    title: taskTitle,
-    description: taskDesc,
-    date: selectedDate,
-    deadlineTime: timeType === 'target' ? targetTime : undefined,
-    scheduledStart: timeType === 'schedule' ? waktuMulai : undefined,
-    scheduledEnd: timeType === 'schedule' ? waktuSelesai : undefined,
-    icon: selectedIcon,
-    category: 'schedule',
-    showOnWidget: true,
-    reminder: true,        
-    reminderDays: [7, 3, 2, 1]  
+const buildMonthGrid = (monthDate: Date) => {
+  const firstDay = startOfMonth(monthDate);
+  const offset = firstDay.getDay();
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(firstDay.getDate() - offset);
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
   });
-  
-  setTaskTitle('');
-  setTaskDesc('');
-  setShowAddTask(false);
 };
-  const renderTimePicker = (value: Date, onChange: (d: Date) => void, onClose: () => void) => {
-    if (Platform.OS === 'ios') {
-      return (
-        <Modal transparent visible animationType="fade">
-          <View style={styles.pickerModal}>
-            <View style={[styles.pickerContainer, { backgroundColor: Colors.beige }]}>
-              <View style={styles.pickerHeader}>
-                <TouchableOpacity onPress={onClose}>
-                  <Text style={styles.pickerBtn}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onClose}>
-                  <Text style={[styles.pickerBtn, { color: Colors.brownDark }]}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={value}
-                mode="time"
-                display="spinner"
-                textColor={Colors.brownDark}
-                onChange={(e, d) => d && onChange(d)}
-              />
-            </View>
-          </View>
-        </Modal>
-      );
+
+function CalendarMonthGrid({
+  monthDate,
+  selectedDate,
+  tasksByDate,
+  onSelectDate,
+}: {
+  monthDate: Date;
+  selectedDate: Date;
+  tasksByDate: Record<string, Task[]>;
+  onSelectDate: (date: Date) => void;
+}) {
+  const { Colors, isDark } = useAppTheme();
+  const today = useMemo(() => new Date(), []);
+  const monthDays = useMemo(() => buildMonthGrid(monthDate), [monthDate]);
+  const weeks = useMemo(() => {
+    const rows: Date[][] = [];
+    for (let index = 0; index < monthDays.length; index += 7) {
+      rows.push(monthDays.slice(index, index + 7));
     }
-    return (
-      <DateTimePicker
-        value={value}
-        mode="time"
-        display="default"
-        onChange={(e, d) => {
-          onClose();
-          if (d) onChange(d);
-        }}
-      />
-    );
-  };
+    return rows;
+  }, [monthDays]);
+  const selectedTextColor = isDark ? Colors.black : Colors.white;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + Spacing.md }]}>
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {/* Calendar Grid */}
-        <View style={styles.calendarCard}>
-          <Calendar
-            key={isDark ? 'dark' : 'light'}
-            current={selectedDateString}
-            onDayPress={(day: any) => {
-              setSelectedDate(new Date(day.timestamp));
-            }}
-            markedDates={markedDates}
-            dayComponent={({ date, state }: any) => {
-              const mark = markedDates[date.dateString as keyof typeof markedDates] as any;
-              const isSelected = mark?.selected;
-              const icons = mark?.icons || [];
-              const isPast = mark?.isPast;
-              const isToday = date.dateString === format(new Date(), 'yyyy-MM-dd');
+    <View style={styles.monthGrid}>
+      <View style={styles.weekdayRow}>
+        {DAY_NAMES.map((day) => (
+          <Text key={day} style={[styles.weekdayText, { color: Colors.textMuted }]}>
+            {day}
+          </Text>
+        ))}
+      </View>
+      {weeks.map((week, rowIndex) => (
+        <View key={rowIndex} style={styles.weekRow}>
+          {week.map((date) => {
+            const key = toKey(date);
+            const taskCount = tasksByDate[key]?.length || 0;
+            const isSelected = sameDate(date, selectedDate);
+            const isToday = sameDate(date, today);
+            const isInMonth = date.getMonth() === monthDate.getMonth();
+            const textColor = isSelected ? selectedTextColor : isInMonth ? Colors.textPrimary : Colors.textMuted;
 
-              return (
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  {/* Connecting Line */}
-                  {isPast && (
-                    <Animated.View 
-                      entering={FadeIn.delay(200).duration(500)}
-                      style={{
-                        position: 'absolute',
-                        top: sw(15), // center of the circle
-                        left: '50%',
-                        width: '100%', // stretches to the next day
-                        height: 3,
-                        backgroundColor: Colors.brownDark,
-                        zIndex: 0,
-                      }} 
-                    />
-                  )}
-                  <TouchableOpacity 
-                    onPress={() => setSelectedDate(new Date(date.timestamp))}
-                    style={[styles.dayContainer, { zIndex: 1 }]}
-                  >
-                    {isToday && !isSelected && <TodayIndicator />}
-                    <View style={[
-                      styles.dateCircle,
-                      isPast && !isSelected && styles.dateCirclePast,
-                      isSelected && styles.dateCircleSelected
-                    ]}>
-                      <Text style={[
-                        styles.dayText,
-                        state === 'disabled' && styles.dayTextDisabled,
-                        isPast && !isSelected && { color: Colors.white, fontWeight: '600' },
-                        isToday && !isSelected && { color: Colors.white, fontWeight: '700' },
-                        isSelected && styles.dayTextSelected
-                      ]}>
-                        {date.day}
-                      </Text>
-                    </View>
-                    
-                    {icons.length > 0 ? (
-                      <View style={styles.dayIconsRow}>
-                        {icons.map((iconName: string, idx: number) => (
-                          <Ionicons 
-                            key={idx} 
-                            name={iconName as any} 
-                            size={10} 
-                            color={Colors.brownDark} 
-                          />
-                        ))}
-                      </View>
-                    ) : (
-                      <View style={styles.dayIconsPlaceholder} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            }}
-            theme={{
-              backgroundColor: Colors.beige,
-              calendarBackground: Colors.beige,
-              textSectionTitleColor: Colors.textSecondary,
-              selectedDayBackgroundColor: Colors.brownDark,
-              selectedDayTextColor: Colors.white,
-              todayTextColor: Colors.brownDark,
-              dayTextColor: Colors.textPrimary,
-              textDisabledColor: Colors.textMuted,
-              arrowColor: Colors.brownDark,
-              monthTextColor: Colors.textPrimary,
-              textDayFontFamily: 'Poppins_400Regular',
-              textMonthFontFamily: 'Poppins_700Bold',
-              textDayHeaderFontFamily: 'Poppins_500Medium',
-              textDayFontWeight: '400',
-              textMonthFontWeight: '700',
-              textDayHeaderFontWeight: '500',
-              textDayFontSize: FontSize.sm,
-              textMonthFontSize: FontSize.lg,
-              textDayHeaderFontSize: FontSize.xxs,
-            }}
-            style={styles.calendar}
-          />
-        </View>
-
-        <View style={styles.contentPadding}>
-          {/* Selected Date Header */}
-          <View style={styles.formHeader}>
-            <Text style={styles.formDateText}>{format(selectedDate, 'EEEE, d MMMM yyyy', { locale: id })}</Text>
-            <TouchableOpacity onPress={() => setShowAddTask(!showAddTask)}>
-              <Text style={styles.tambahText}>{showAddTask ? 'Batal' : '+ Tambah'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {showAddTask && (
-            <View style={styles.addTaskForm}>
-              <View style={styles.addTaskHeader}>
-                <View>
-                  <Text style={styles.formTitle}>Tambah Jadwal</Text>
-                  <Text style={styles.formSubtitle}>
-                    {format(selectedDate, 'EEEE, d MMMM yyyy', { locale: id })}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.nameIconRow}>
-                <View style={styles.nameField}>
-                  <Text style={styles.fieldLabel}>Nama jadwal</Text>
-                  <View style={styles.inputShell}>
-                    <Ionicons name="pencil-outline" size={18} color={Colors.textMuted} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Contoh: Belajar matematika"
-                      placeholderTextColor={Colors.textMuted}
-                      value={taskTitle}
-                      onChangeText={setTaskTitle}
-                    />
-                  </View>
-                </View>
-                <View style={styles.iconField}>
-                  <Text style={styles.fieldLabel}>Ikon</Text>
-                  <TouchableOpacity style={styles.iconTrigger} onPress={() => setShowIconPicker(true)}>
-                    <Ionicons name={selectedIcon as any} size={20} color={Colors.brownDark} />
-                    <Ionicons name="chevron-down" size={14} color={Colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <Text style={styles.fieldLabel}>Catatan</Text>
-              <View style={[styles.inputShell, styles.textAreaShell]}>
-                <Ionicons name="document-text-outline" size={18} color={Colors.textMuted} style={styles.textAreaIcon} />
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Opsional"
-                  placeholderTextColor={Colors.textMuted}
-                  multiline
-                  value={taskDesc}
-                  onChangeText={setTaskDesc}
-                />
-              </View>
-
-              <View style={styles.timeSectionHeader}>
-                <Text style={styles.fieldLabel}>Waktu</Text>
-                <Text style={styles.fieldHint}>
-                  {timeType === 'schedule' ? 'Mulai dan selesai' : 'Batas waktu'}
-                </Text>
-              </View>
-              <View style={styles.typeRow}>
-                <TouchableOpacity
-                  style={[styles.typeBtn, timeType === 'schedule' && styles.typeBtnActive]}
-                  onPress={() => setTimeType('schedule')}
-                >
-                  <Ionicons
-                    name="time-outline"
-                    size={17}
-                    color={timeType === 'schedule' ? Colors.white : Colors.textSecondary}
-                  />
-                  <Text style={[styles.typeBtnText, timeType === 'schedule' && styles.typeBtnTextActive]}>
-                    Ada jam mulai
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.typeBtn, timeType === 'target' && styles.typeBtnActive]}
-                  onPress={() => setTimeType('target')}
-                >
-                  <Ionicons
-                    name="flag-outline"
-                    size={17}
-                    color={timeType === 'target' ? Colors.white : Colors.textSecondary}
-                  />
-                  <Text style={[styles.typeBtnText, timeType === 'target' && styles.typeBtnTextActive]}>
-                    Deadline saja
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {timeType === 'schedule' ? (
-                <View style={styles.timeRangeRow}>
-                  <TouchableOpacity 
-                    style={styles.datePickerBtn}
-                    onPress={() => setShowStartTimePicker(true)}
-                  >
-                    <Text style={styles.timePickerLabel}>Mulai</Text>
-                    <View style={styles.timeValueRow}>
-                      <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
-                      <Text style={styles.datePickerText}>{waktuMulai}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.datePickerBtn}
-                    onPress={() => setShowEndTimePicker(true)}
-                  >
-                    <Text style={styles.timePickerLabel}>Selesai</Text>
-                    <View style={styles.timeValueRow}>
-                      <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
-                      <Text style={styles.datePickerText}>{waktuSelesai}</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.timeRangeRow}>
-                  <TouchableOpacity 
-                    style={styles.datePickerBtn}
-                    onPress={() => setShowTargetTimePicker(true)}
-                  >
-                    <Text style={styles.timePickerLabel}>Deadline</Text>
-                    <View style={styles.timeValueRow}>
-                      <Ionicons name="time-outline" size={18} color={Colors.brownDark} />
-                      <Text style={styles.datePickerText}>{targetTime}</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              <TouchableOpacity 
-                style={[styles.saveBtn, !canSaveTask && styles.saveBtnDisabled]}
-                onPress={handleAddTask}
-                disabled={!canSaveTask}
+            return (
+              <InteractivePressable
+                key={key}
+                onPress={() => onSelectDate(date)}
+                style={[
+                  styles.monthCell,
+                  isSelected && { backgroundColor: Colors.brownDark },
+                  !isSelected && isToday && { borderColor: Colors.calendarSelected, borderWidth: 1 },
+                ]}
               >
-                <Ionicons name="checkmark-circle" size={20} color={Colors.white} />
-                <Text style={styles.saveBtnText}>Simpan Jadwal</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Timeline View */}
-          <Text style={styles.sectionLabel}>Jadwal Hari Ini</Text>
-          {isLoading ? (
-            <Text style={styles.statusText}>Memuat jadwal...</Text>
-          ) : (
-            tasks
-              .filter(t => {
-                const d = parseTaskDate(t.date);
-                if (!d) return false;
-                return format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-              })
-              .sort((a, b) => (a.scheduledStart || '').localeCompare(b.scheduledStart || ''))
-              .map((item, index) => (
-                <View key={item.id || index} style={styles.taskItem}>
-                  <View style={styles.taskTime}>
-                    <Text style={styles.timeText}>{item.scheduledStart || item.deadlineTime || '--.--'}</Text>
-                    {item.scheduledEnd ? <Text style={styles.timeTextEnd}>{item.scheduledEnd}</Text> : null}
-                  </View>
-                  <View style={styles.taskIndicator}>
-                    <View style={styles.dot} />
-                    <View style={styles.line} />
-                  </View>
-                  <View style={styles.taskContent}>
-                    <View style={styles.taskHeaderRow}>
-                      <Ionicons name={(item.icon || 'calendar') as any} size={16} color={Colors.brownDark} />
-                      <Text style={styles.taskTitle}>{item.title}</Text>
-                    </View>
-                    {item.description ? <Text style={styles.taskDesc}>{item.description}</Text> : null}
-                  </View>
-                </View>
-              ))
-          )}
-          
-          {!isLoading && tasks.filter(t => {
-            const d = parseTaskDate(t.date);
-            if (!d) return false;
-            return format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-          }).length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="calendar-outline" size={48} color={Colors.textMuted} />
-              <Text style={styles.emptyText}>Tidak ada jadwal untuk hari ini.</Text>
-            </View>
-          )}
+                <Text style={[styles.monthCellText, { color: textColor }]}>{date.getDate()}</Text>
+                {taskCount > 0 ? (
+                  <View style={[styles.monthDot, { backgroundColor: isSelected ? selectedTextColor : Colors.calendarDot }]} />
+                ) : (
+                  <View style={styles.monthDotPlaceholder} />
+                )}
+              </InteractivePressable>
+            );
+          })}
         </View>
-      </ScrollView>
-
-      {/* Time Pickers */}
-      {showTargetTimePicker && renderTimePicker(targetTimeDate, (d) => {
-        setTargetTimeDate(d);
-        const h = d.getHours().toString().padStart(2, '0');
-        const m = d.getMinutes().toString().padStart(2, '0');
-        setTargetTime(`${h}.${m}`);
-      }, () => setShowTargetTimePicker(false))}
-
-      {showStartTimePicker && renderTimePicker(waktuMulaiDate, (d) => {
-        setWaktuMulaiDate(d);
-        const h = d.getHours().toString().padStart(2, '0');
-        const m = d.getMinutes().toString().padStart(2, '0');
-        setWaktuMulai(`${h}.${m}`);
-      }, () => setShowStartTimePicker(false))}
-
-      {showEndTimePicker && renderTimePicker(waktuSelesaiDate, (d) => {
-        setWaktuSelesaiDate(d);
-        const h = d.getHours().toString().padStart(2, '0');
-        const m = d.getMinutes().toString().padStart(2, '0');
-        setWaktuSelesai(`${h}.${m}`);
-      }, () => setShowEndTimePicker(false))}
-
-      {/* Icon Picker Modal */}
-      <Modal visible={showIconPicker} transparent animationType="fade">
-        <TouchableOpacity style={styles.iconModalOverlay} activeOpacity={1} onPress={() => setShowIconPicker(false)}>
-          <View style={styles.iconModalContainer}>
-            <Text style={styles.iconModalTitle}>Pilih Ikon</Text>
-            <ScrollView contentContainerStyle={styles.iconGrid}>
-              {AVAILABLE_ICONS.map((iconName) => (
-                <TouchableOpacity
-                  key={iconName}
-                  style={[styles.iconCell, selectedIcon === iconName && styles.iconCellSelected]}
-                  onPress={() => {
-                    setSelectedIcon(iconName);
-                    setShowIconPicker(false);
-                  }}
-                >
-                  <Ionicons 
-                    name={iconName as any} 
-                    size={24} 
-                    color={selectedIcon === iconName ? Colors.white : Colors.brownDark} 
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
+      ))}
     </View>
   );
 }
 
-const getStyles = (Colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.cream },
-  topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.beige,
-    ...Shadow.sm,
-    zIndex: 10,
-  },
-  headerTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  backBtn: { padding: Spacing.sm },
-  calendarCard: {
-    backgroundColor: Colors.beige,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    ...Shadow.md,
-  },
-  calendar: {
-    paddingBottom: Spacing.sm,
-  },
-  contentPadding: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: sw(100),
-  },
-  formHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: Spacing.lg 
-  },
-  formDateText: { 
-    fontSize: FontSize.md, 
-    fontWeight: '700', 
-    color: Colors.textPrimary 
-  },
-  tambahText: { 
-    fontSize: FontSize.md, 
-    fontWeight: '600', 
-    color: Colors.brownDark,
-    backgroundColor: Colors.beigeDark,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-  },
-  addTaskForm: {
-    backgroundColor: Colors.beige,
-    padding: Spacing.md,
-    borderRadius: Radius.xl,
-    marginBottom: Spacing.xl,
-    ...Shadow.sm,
-  },
-  addTaskHeader: {
-    marginBottom: Spacing.lg,
-  },
-  formTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  formSubtitle: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  nameIconRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
-  nameField: { flex: 1 },
-  iconField: { width: sw(82) },
-  fieldLabel: {
-    fontSize: FontSize.sm,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  fieldHint: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: '600',
-  },
-  sectionLabel: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
-  inputShell: {
-    minHeight: sw(50),
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.inputBg,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    paddingHorizontal: Spacing.md,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: sw(12),
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-  },
-  textAreaShell: {
-    minHeight: sw(84),
-    alignItems: 'flex-start',
-    paddingTop: sw(12),
-    marginBottom: Spacing.md,
-  },
-  textArea: {
-    minHeight: sw(62),
-    paddingTop: 0,
-    textAlignVertical: 'top',
-  },
-  textAreaIcon: {
-    marginTop: sw(2),
-  },
-  iconTrigger: {
-    height: sw(50),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sw(6),
-    backgroundColor: Colors.inputBg,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-  },
-  datePickerBtn: {
-    flex: 1,
-    minHeight: sw(70),
-    backgroundColor: Colors.inputBg,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: sw(10),
-    justifyContent: 'center',
-  },
-  timePickerLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    marginBottom: Spacing.xs,
-  },
-  timeValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  datePickerText: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '600' },
-  timeSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  typeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
-  typeBtn: {
-    flex: 1,
-    minHeight: sw(46),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sw(6),
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: sw(10),
-    backgroundColor: Colors.inputBg,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-  },
-  typeBtnActive: { backgroundColor: Colors.brownDark, borderColor: Colors.brownDark },
-  typeBtnText: { fontSize: FontSize.sm, color: Colors.textPrimary, fontWeight: '600' },
-  typeBtnTextActive: { color: Colors.white },
-  timeRangeRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  saveBtn: {
-    minHeight: sw(52),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.brownDark,
-    borderRadius: Radius.xl,
-    marginTop: Spacing.lg,
-    paddingVertical: sw(14),
-    ...Shadow.sm,
-  },
-  saveBtnDisabled: {
-    opacity: 0.45,
-  },
-  saveBtnText: { color: Colors.white, fontSize: FontSize.md, fontWeight: '700' },
-  taskItem: { flexDirection: 'row', marginBottom: Spacing.md },
-  taskTime: { width: sw(60), paddingTop: sw(4) },
-  timeText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.brownDark },
-  timeTextEnd: { fontSize: FontSize.xxs, fontWeight: '500', color: Colors.textSecondary, marginTop: 2 },
-  taskIndicator: { alignItems: 'center', width: sw(30) },
-  dot: { width: sw(10), height: sw(10), borderRadius: sw(5), backgroundColor: Colors.brownDark, zIndex: 1, marginTop: sw(8) },
-  line: { width: 2, flex: 1, backgroundColor: Colors.beige, marginTop: -sw(2) },
-  taskContent: { 
-    flex: 1, 
-    backgroundColor: Colors.beige, 
-    padding: Spacing.md, 
-    borderRadius: Radius.xl, 
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.brownDark,
-    ...Shadow.sm 
-  },
-  taskHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 },
-  taskTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
-  taskDesc: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: sw(4) },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xl, opacity: 0.5 },
-  emptyText: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.md },
-  statusText: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
-  pickerModal: { flex: 1, justifyContent: 'flex-end', backgroundColor: Colors.overlay },
-  pickerContainer: { backgroundColor: Colors.cream, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, paddingBottom: sw(32) },
-  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.inputBorder },
-  pickerBtn: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textMuted },
-  
-  // Icon Picker Styles
-  iconModalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center' },
-  iconModalContainer: { backgroundColor: Colors.beige, borderRadius: Radius.xl, width: '85%', maxHeight: '65%', padding: Spacing.lg, ...Shadow.lg },
-  iconModalTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.brownDark, marginBottom: Spacing.md, textAlign: 'center' },
-  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm },
-  iconCell: { width: sw(50), height: sw(50), borderRadius: Radius.lg, backgroundColor: Colors.inputBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.inputBorder },
-  iconCellSelected: { backgroundColor: Colors.brownDark, borderColor: Colors.brownDark },
+function TimelineTask({ task, index }: { task: Task; index: number }) {
+  const { Colors } = useAppTheme();
+  const accent = getTaskCardColor(task.title || index);
+  const time = task.scheduledStart || task.deadlineTime || '--.--';
 
-  // Custom Day Component Styles
-  dayContainer: {
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 60).duration(320)} layout={Layout.springify()} style={styles.timelineRow}>
+      <View style={styles.timeColumn}>
+        <Text style={[styles.timeText, { color: Colors.textPrimary }]}>{time}</Text>
+        {task.scheduledEnd ? <Text style={[styles.timeEnd, { color: Colors.textMuted }]}>{task.scheduledEnd}</Text> : null}
+      </View>
+      <View style={styles.lineColumn}>
+        <View style={[styles.timelineDot, { backgroundColor: accent }]} />
+        <View style={[styles.timelineLine, { borderColor: Colors.borderLight }]} />
+      </View>
+      <View style={[styles.timelineCard, { backgroundColor: Colors.dailyCardBg, borderColor: Colors.dailyCardBorder }]}>
+        <Text style={[styles.timelineTitle, { color: Colors.textPrimary }]}>{task.title}</Text>
+        {task.description ? <Text style={[styles.timelineDesc, { color: Colors.textSecondary }]}>{task.description}</Text> : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+export default function CalendarScreen() {
+  const { Colors, isDark } = useAppTheme();
+  const screenStyles = useMemo(() => makeStyles(Colors), [Colors]);
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
+  const { tasks, isLoading, addTask } = useTasks();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleMonth, setVisibleMonth] = useState(startOfMonth(new Date()));
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [addTaskDate, setAddTaskDate] = useState(new Date());
+  const [addTaskMonth, setAddTaskMonth] = useState(startOfMonth(new Date()));
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+  const [timeMode, setTimeMode] = useState<'scheduled' | 'target'>('scheduled');
+  const [startTime, setStartTime] = useState('09.00');
+  const [endTime, setEndTime] = useState('10.00');
+  const [targetTime, setTargetTime] = useState('17.00');
+
+  React.useEffect(() => {
+    if (params.add === 'true') {
+      setShowAddTask(true);
+      router.setParams({ add: undefined });
+    }
+  }, [params.add]);
+
+  React.useEffect(() => {
+    if (showAddTask) {
+      setAddTaskDate(selectedDate);
+      setAddTaskMonth(startOfMonth(selectedDate));
+    }
+  }, [showAddTask, selectedDate]);
+
+  React.useEffect(() => {
+    const monthStart = startOfMonth(addTaskDate);
+    if (monthStart.getMonth() !== addTaskMonth.getMonth() || monthStart.getFullYear() !== addTaskMonth.getFullYear()) {
+      setAddTaskMonth(monthStart);
+    }
+  }, [addTaskDate]);
+
+  React.useEffect(() => {
+    const monthStart = startOfMonth(selectedDate);
+    if (monthStart.getMonth() !== visibleMonth.getMonth() || monthStart.getFullYear() !== visibleMonth.getFullYear()) {
+      setVisibleMonth(monthStart);
+    }
+  }, [selectedDate]);
+
+  const tasksByDate = useMemo(() => {
+    return tasks.reduce<Record<string, Task[]>>((acc, task) => {
+      if (task.status === 'archived') return acc;
+      const parsed = parseTaskDate(task.date);
+      if (!parsed) return acc;
+      const key = toKey(parsed);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(task);
+      return acc;
+    }, {});
+  }, [tasks]);
+
+  const selectedTasks = useMemo(() => {
+    return tasks
+      .filter((task) => sameDate(selectedDate, task.date) && task.status !== 'archived')
+      .sort((a, b) => (a.scheduledStart || a.deadlineTime || '').localeCompare(b.scheduledStart || b.deadlineTime || ''));
+  }, [tasks, selectedDate]);
+
+  const canSaveTask = taskTitle.trim().length > 0;
+
+  const handleAddTask = async () => {
+    if (!canSaveTask) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const isScheduled = timeMode === 'scheduled';
+    try {
+      await addTask({
+        title: taskTitle.trim(),
+        description: taskDesc.trim(),
+        date: addTaskDate,
+        scheduledStart: isScheduled ? startTime.trim() || undefined : undefined,
+        scheduledEnd: isScheduled ? endTime.trim() || undefined : undefined,
+        deadlineTime: !isScheduled ? targetTime.trim() || undefined : undefined,
+        icon: 'calendar-outline',
+        category: 'schedule',
+        showOnWidget: true,
+        reminder: true,
+        reminderDays: [7, 3, 2, 1],
+      });
+      setTaskTitle('');
+      setTaskDesc('');
+      setSelectedDate(addTaskDate);
+      setShowAddTask(false);
+    } catch (error: any) {
+      console.error('[CalendarScreen] Gagal menyimpan jadwal:', error);
+      Alert.alert('Gagal Menyimpan', error.message || 'Terjadi kesalahan saat menyimpan jadwal.');
+    }
+  };
+
+  return (
+    <View style={[screenStyles.container, { paddingTop: insets.top + Spacing.lg }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={screenStyles.content} keyboardShouldPersistTaps="handled">
+        <View style={screenStyles.header}>
+          <View>
+            <Text style={screenStyles.kicker}>KALENDAR</Text>
+            <Text style={screenStyles.title}>{format(selectedDate, 'EEEE, d MMMM', { locale: id })}</Text>
+          </View>
+          <InteractivePressable style={screenStyles.addButton} onPress={() => setShowAddTask(true)}>
+            <Ionicons name="add" size={sw(20)} color={isDark ? Colors.black : Colors.white} />
+          </InteractivePressable>
+        </View>
+
+        <Animated.View entering={FadeInDown.duration(360)} style={screenStyles.monthBlock}>
+          <View style={screenStyles.monthHeader}>
+            <InteractivePressable style={screenStyles.monthNav} onPress={() => setVisibleMonth(addMonths(visibleMonth, -1))}>
+              <Ionicons name="chevron-back" size={sw(18)} color={Colors.textPrimary} />
+            </InteractivePressable>
+            <Text style={screenStyles.monthTitle}>{format(visibleMonth, 'MMMM yyyy', { locale: id })}</Text>
+            <InteractivePressable style={screenStyles.monthNav} onPress={() => setVisibleMonth(addMonths(visibleMonth, 1))}>
+              <Ionicons name="chevron-forward" size={sw(18)} color={Colors.textPrimary} />
+            </InteractivePressable>
+          </View>
+          <CalendarMonthGrid
+            monthDate={visibleMonth}
+            selectedDate={selectedDate}
+            tasksByDate={tasksByDate}
+            onSelectDate={setSelectedDate}
+          />
+        </Animated.View>
+
+        <View style={screenStyles.timelineHeader}>
+          <Text style={screenStyles.sectionTitle}>List Kegiatan</Text>
+          <Text style={screenStyles.sectionHint}>{selectedTasks.length} jadwal</Text>
+        </View>
+
+        {isLoading ? (
+          <Text style={screenStyles.statusText}>Memuat jadwal...</Text>
+        ) : selectedTasks.length > 0 ? (
+          selectedTasks.map((task, index) => <TimelineTask key={task.id} task={task} index={index} />)
+        ) : (
+          <View style={screenStyles.emptyBox}>
+            <Text style={screenStyles.emptyTitle}>Tanggal ini masih kosong.</Text>
+            <Text style={screenStyles.emptyText}>Gunakan tombol tambah untuk menyusun agenda secara kronologis.</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <Modal visible={showAddTask} transparent animationType="fade" onRequestClose={() => setShowAddTask(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={screenStyles.modalKeyboard}>
+          <Pressable style={screenStyles.modalOverlay} onPress={() => setShowAddTask(false)}>
+            <Animated.View 
+              entering={FadeInDown.duration(260)} 
+              style={[
+                screenStyles.sheet, 
+                { 
+                  maxHeight: '80%', 
+                  paddingBottom: Math.max(insets.bottom, Spacing.xl)
+                }
+              ]}
+            >
+              <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '100%', flexDirection: 'column' }}>
+                <View style={screenStyles.sheetHeader}>
+                  <View>
+                    <Text style={screenStyles.sheetTitle}>Tambah Jadwal</Text>
+                    <Text style={screenStyles.sheetSubtitle}>{format(addTaskDate, 'EEEE, d MMMM yyyy', { locale: id })}</Text>
+                  </View>
+                  <InteractivePressable onPress={() => setShowAddTask(false)}>
+                    <Ionicons name="close" size={sw(22)} color={Colors.textPrimary} />
+                  </InteractivePressable>
+                </View>
+
+                <ScrollView 
+                  keyboardShouldPersistTaps="handled" 
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false} 
+                  style={{ flexShrink: 1 }}
+                  contentContainerStyle={{ paddingBottom: Spacing.xl }}
+                >
+                  <View style={screenStyles.datePickerHeader}>
+                    <Text style={screenStyles.label}>Tanggal</Text>
+                    <Text style={screenStyles.datePreview}>{format(addTaskDate, 'd MMM yyyy', { locale: id })}</Text>
+                  </View>
+                  <View style={screenStyles.monthHeader}>
+                    <InteractivePressable style={screenStyles.monthNav} onPress={() => setAddTaskMonth(addMonths(addTaskMonth, -1))}>
+                      <Ionicons name="chevron-back" size={sw(18)} color={Colors.textPrimary} />
+                    </InteractivePressable>
+                    <Text style={screenStyles.monthTitle}>{format(addTaskMonth, 'MMMM yyyy', { locale: id })}</Text>
+                    <InteractivePressable style={screenStyles.monthNav} onPress={() => setAddTaskMonth(addMonths(addTaskMonth, 1))}>
+                      <Ionicons name="chevron-forward" size={sw(18)} color={Colors.textPrimary} />
+                    </InteractivePressable>
+                  </View>
+                  <CalendarMonthGrid
+                    monthDate={addTaskMonth}
+                    selectedDate={addTaskDate}
+                    tasksByDate={tasksByDate}
+                    onSelectDate={setAddTaskDate}
+                  />
+
+                  <Text style={screenStyles.label}>Nama jadwal</Text>
+                  <TextInput
+                    style={screenStyles.input}
+                    placeholder="Contoh: Review materi"
+                    placeholderTextColor={Colors.textMuted}
+                    value={taskTitle}
+                    onChangeText={setTaskTitle}
+                  />
+
+                  <Text style={screenStyles.label}>Catatan</Text>
+                  <TextInput
+                    style={[screenStyles.input, screenStyles.textArea]}
+                    placeholder="Opsional"
+                    placeholderTextColor={Colors.textMuted}
+                    value={taskDesc}
+                    onChangeText={setTaskDesc}
+                    multiline
+                    textAlignVertical="top"
+                  />
+
+                  <View style={screenStyles.timeModeRow}>
+                    <InteractivePressable
+                      style={[screenStyles.timeModePill, timeMode === 'scheduled' && screenStyles.timeModePillActive]}
+                      onPress={() => setTimeMode('scheduled')}
+                    >
+                      <Text style={[screenStyles.timeModeText, timeMode === 'scheduled' && screenStyles.timeModeTextActive]}>Waktu terjadwal</Text>
+                    </InteractivePressable>
+                    <InteractivePressable
+                      style={[screenStyles.timeModePill, timeMode === 'target' && screenStyles.timeModePillActive]}
+                      onPress={() => setTimeMode('target')}
+                    >
+                      <Text style={[screenStyles.timeModeText, timeMode === 'target' && screenStyles.timeModeTextActive]}>Waktu target</Text>
+                    </InteractivePressable>
+                  </View>
+
+                  {timeMode === 'scheduled' ? (
+                    <View style={screenStyles.timeRow}>
+                      <View style={screenStyles.timeField}>
+                        <TimePicker label="Mulai" value={startTime} onChange={setStartTime} />
+                      </View>
+                      <View style={screenStyles.timeField}>
+                        <TimePicker label="Selesai" value={endTime} onChange={setEndTime} />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={screenStyles.timeField}>
+                      <TimePicker label="Target" value={targetTime} onChange={setTargetTime} />
+                    </View>
+                  )}
+
+                  <InteractivePressable style={[screenStyles.saveButton, !canSaveTask && screenStyles.disabledButton]} onPress={handleAddTask} disabled={!canSaveTask}>
+                    <Text style={screenStyles.saveText}>Simpan Jadwal</Text>
+                  </InteractivePressable>
+                </ScrollView>
+              </Pressable>
+            </Animated.View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  monthGrid: { marginTop: Spacing.sm },
+  weekdayRow: { flexDirection: 'row', marginBottom: Spacing.xs },
+  weekdayText: { flex: 1, textAlign: 'center', fontSize: FontSize.xxs, letterSpacing: 1.1, textTransform: 'uppercase' },
+  weekRow: { flexDirection: 'row', marginBottom: Spacing.xs },
+  monthCell: {
+    flex: 1,
+    minHeight: sw(44),
     alignItems: 'center',
     justifyContent: 'center',
-    width: sw(38),
-    paddingTop: sw(2),
+    borderRadius: Radius.md,
   },
-  dateCircle: {
-    width: sw(28),
-    height: sw(28),
-    borderRadius: sw(14),
+  monthCellText: { fontSize: FontSize.sm, fontWeight: '600' },
+  monthDot: { width: sw(4), height: sw(4), borderRadius: sw(2), marginTop: sw(4) },
+  monthDotPlaceholder: { width: sw(4), height: sw(4), marginTop: sw(4), opacity: 0 },
+  timelineRow: { flexDirection: 'row', minHeight: sw(88), marginBottom: Spacing.md },
+  timeColumn: { width: sw(62), paddingTop: sw(3) },
+  timeText: { fontSize: FontSize.sm, fontWeight: '700' },
+  timeEnd: { fontSize: FontSize.xxs, marginTop: sw(3) },
+  lineColumn: { width: sw(26), alignItems: 'center' },
+  timelineDot: { width: sw(10), height: sw(10), borderRadius: sw(5), marginTop: sw(8), zIndex: 2 },
+  timelineLine: { flex: 1, borderLeftWidth: 1, borderStyle: 'dashed', marginTop: sw(3) },
+  timelineCard: { flex: 1, borderWidth: 1, borderRadius: Radius.md, padding: Spacing.md },
+  timelineTitle: { fontSize: FontSize.md, fontWeight: '700' },
+  timelineDesc: { fontSize: FontSize.sm, lineHeight: sw(20), marginTop: Spacing.xs },
+});
+
+const makeStyles = (Colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.cream },
+  content: { paddingHorizontal: Spacing.xl, paddingBottom: sw(132) },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  kicker: { fontSize: FontSize.xxs, color: Colors.textMuted, letterSpacing: 2, marginBottom: Spacing.sm },
+  title: { fontSize: FontSize.xxl, color: Colors.textPrimary, fontWeight: '700' },
+  addButton: { width: sw(38), height: sw(38), borderRadius: Radius.full, backgroundColor: Colors.brownDark, alignItems: 'center', justifyContent: 'center' },
+  monthBlock: { marginTop: Spacing.lg, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: Radius.lg, padding: Spacing.md, backgroundColor: Colors.profileFormBg },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  monthTitle: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '700' },
+  monthNav: {
+    width: sw(34),
+    height: sw(34),
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.inputBg,
   },
-  dateCirclePast: {
-    backgroundColor: Colors.brownDark,
-  },
-  dateCircleSelected: {
-    backgroundColor: Colors.brownDark,
-    borderWidth: 2,
-    borderColor: Colors.white,
-    ...Shadow.glow,
-  },
-  dayText: {
-    fontSize: FontSize.md,
-    color: Colors.textPrimary,
-    fontWeight: '400',
-  },
-  dayTextDisabled: {
-    color: Colors.textMuted,
-  },
-  dayTextSelected: {
-    color: Colors.white,
-    fontWeight: '700',
-  },
-  dayIconsRow: {
-    flexDirection: 'row',
-    marginTop: sw(2),
-    gap: sw(2),
-    height: sw(12),
-    alignItems: 'center',
-  },
-  dayIconsPlaceholder: {
-    height: sw(12),
-    marginTop: sw(2),
-  },
+  timelineHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.md },
+  sectionTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary },
+  sectionHint: { fontSize: FontSize.xs, color: Colors.textMuted },
+  emptyBox: { borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderLight, borderRadius: Radius.md, padding: Spacing.lg },
+  emptyTitle: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '700' },
+  emptyText: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: sw(20), marginTop: Spacing.xs },
+  statusText: { color: Colors.textMuted, fontSize: FontSize.sm },
+  modalKeyboard: { flex: 1 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+  sheet: { backgroundColor: Colors.profileFormBg, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.xl, borderWidth: 1, borderColor: Colors.borderLight },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.lg },
+  sheetTitle: { fontSize: FontSize.xl, color: Colors.textPrimary, fontWeight: '700' },
+  sheetSubtitle: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: Spacing.xs },
+  datePickerHeader: { marginBottom: Spacing.sm },
+  datePreview: { fontSize: FontSize.sm, color: Colors.textPrimary, fontWeight: '600' },
+  label: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: '600', marginBottom: Spacing.xs, marginTop: Spacing.md },
+  input: { minHeight: sw(50), borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: Radius.md, paddingHorizontal: Spacing.md, color: Colors.textPrimary, backgroundColor: Colors.inputBg, fontSize: FontSize.md },
+  textArea: { minHeight: sw(86), paddingTop: Spacing.md },
+  timeModeRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  timeModePill: { flex: 1, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: Radius.full, paddingVertical: Spacing.sm, alignItems: 'center', backgroundColor: Colors.inputBg },
+  timeModePillActive: { backgroundColor: Colors.brownDark, borderColor: Colors.brownDark },
+  timeModeText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: '600' },
+  timeModeTextActive: { color: Colors.textLight },
+  timeRow: { flexDirection: 'row', gap: Spacing.md },
+  timeField: { flex: 1 },
+  saveButton: { marginTop: Spacing.xl, minHeight: sw(52), borderRadius: Radius.md, backgroundColor: Colors.brownDark, alignItems: 'center', justifyContent: 'center' },
+  disabledButton: { opacity: 0.42 },
+  saveText: { color: Colors.textLight, fontSize: FontSize.md, fontWeight: '700' },
 });

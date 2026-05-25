@@ -3,23 +3,47 @@
 // Auto-reminder at H-7, H-3, H-2, H-1
 // ============================================
 
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { Task, ReminderDay } from '@/types/task.types';
 import { parseTaskDate } from '@/utils/date';
 
 // ──── Configuration ────
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+let notificationsModulePromise: Promise<NotificationsModule | null> | null = null;
+
+function isExpoGoAndroid(): boolean {
+  return Platform.OS === 'android' && Constants.appOwnership === 'expo';
+}
+
+async function getNotificationsModule(): Promise<NotificationsModule | null> {
+  if (isExpoGoAndroid()) return null;
+
+  notificationsModulePromise ??= import('expo-notifications')
+    .then((Notifications) => {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+      return Notifications;
+    })
+    .catch((error) => {
+      if (!__DEV__) {
+        console.warn('[Notification] Failed to load notification module:', error);
+      }
+      return null;
+    });
+
+  return notificationsModulePromise;
+}
 
 // ──── Constants ────
 
@@ -67,6 +91,9 @@ function buildReminderTitle(taskTitle: string, daysBefore: number): string {
 
 /** Request notification permissions */
 export async function requestNotificationPermission(): Promise<boolean> {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return false;
+
   if (!Device.isDevice) {
     console.warn('Notifications only work on physical devices');
     return false;
@@ -105,6 +132,9 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 /** Schedule all reminder notifications for a task */
 export async function scheduleTaskReminders(task: Task): Promise<string[]> {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return [];
+
   if (!task.reminder || task.reminderDays.length === 0) return [];
 
   const notificationIds: string[] = [];
@@ -157,6 +187,9 @@ export async function scheduleTaskReminders(task: Task): Promise<string[]> {
 
 /** Cancel all notifications for a specific task */
 export async function cancelTaskReminders(taskId: string): Promise<void> {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
+
   try {
     const allScheduled =
       await Notifications.getAllScheduledNotificationsAsync();
@@ -184,17 +217,26 @@ export async function rescheduleTaskReminders(
 
 /** Cancel all scheduled notifications */
 export async function cancelAllNotifications(): Promise<void> {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
+
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
 /** Get count of currently scheduled notifications (for debugging) */
 export async function getScheduledCount(): Promise<number> {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return 0;
+
   const all = await Notifications.getAllScheduledNotificationsAsync();
   return all.length;
 }
 
 /** List all scheduled notifications (for debugging) */
-export async function listScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
+export async function listScheduledNotifications(): Promise<unknown[]> {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return [];
+
   return Notifications.getAllScheduledNotificationsAsync();
 }
 
@@ -203,13 +245,23 @@ export async function listScheduledNotifications(): Promise<Notifications.Notifi
 /** Setup notification tap handler */
 export function setupNotificationResponseListener(
   onTap: (taskId: string) => void
-): Notifications.EventSubscription {
-  return Notifications.addNotificationResponseReceivedListener(
-    (response) => {
-      const taskId = response.notification.request.content.data?.taskId;
-      if (taskId) {
-        onTap(taskId as string);
+): { remove: () => void } {
+  let subscription: { remove: () => void } | null = null;
+
+  getNotificationsModule().then((Notifications) => {
+    if (!Notifications) return;
+
+    subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const taskId = response.notification.request.content.data?.taskId;
+        if (taskId) {
+          onTap(taskId as string);
+        }
       }
-    }
-  );
+    );
+  });
+
+  return {
+    remove: () => subscription?.remove(),
+  };
 }

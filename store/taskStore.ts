@@ -30,6 +30,9 @@ export const useTaskStore = create<TaskStore>()(
       isOffline: false,
       hasSeenOnboarding: false,
 
+      // ───── Toast State ─────
+      toast: null,
+
       // ───── Task Actions ─────
       setTasks: (tasks: Task[]) => set({ tasks }),
 
@@ -98,6 +101,12 @@ export const useTaskStore = create<TaskStore>()(
 
       setHasSeenOnboarding: (hasSeenOnboarding: boolean) =>
         set({ hasSeenOnboarding }),
+
+      // ───── Toast Actions ─────
+      showToast: (message: string, type: 'success' | 'info' | 'warning' = 'success') =>
+        set({ toast: { message, type } }),
+
+      hideToast: () => set({ toast: null }),
     }),
     {
       name: 'jadwalin-storage',

@@ -23,6 +23,7 @@ import { useTaskStore } from '@/store/taskStore';
 import { requestNotificationPermission } from '@/services/notification.service';
 import { useAppTheme } from '@/constants/theme';
 import OfflineIndicator from '@/components/OfflineIndicator';
+import ToastNotification from '@/components/ToastNotification';
 
 // Map font weights to Poppins
 const mapFontWeightToPoppins = (style: any) => {
@@ -171,10 +172,10 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, [appReady, isAuthenticated, segments]);
 
-  // Don't render until ready - keep background solid purple to prevent color flash
+  // Don't render until ready - keep background aligned with the selected theme.
   if (!appReady) {
     return (
-      <View style={[styles.loading, { backgroundColor: '#6A3DE8' }]} />
+      <View style={[styles.loading, { backgroundColor: Colors.cream }]} />
     );
   }
 
@@ -194,6 +195,7 @@ export default function RootLayout() {
       <View pointerEvents="none" style={styles.offlineIndicator}>
         <OfflineIndicator />
       </View>
+      <ToastNotification />
 
       {showSplash && (
         <Animated.View
@@ -201,7 +203,7 @@ export default function RootLayout() {
           style={[
             StyleSheet.absoluteFill,
             {
-              backgroundColor: '#6A3DE8',
+              backgroundColor: Colors.cream,
               justifyContent: 'center',
               alignItems: 'center',
               zIndex: 99999,
@@ -217,10 +219,10 @@ export default function RootLayout() {
             entering={FadeIn.delay(500).duration(800)}
             style={{
               marginTop: 5,
-              fontSize: 30,
-              fontFamily: 'Poppins_500Medium',
-              color: '#ffffffff',
-              letterSpacing: -0.5,
+              fontSize: 28,
+              fontFamily: 'Poppins_300Light',
+              color: Colors.textPrimary,
+              letterSpacing: 2,
             }}
           >
             Jadwalin

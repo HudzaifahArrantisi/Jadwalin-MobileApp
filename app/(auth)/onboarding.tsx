@@ -5,19 +5,20 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Dimensions, TouchableOpacity,
+  View, Text, StyleSheet,
   FlatList, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Animated, {
   useAnimatedStyle, withRepeat, withSequence, withTiming,
-  withSpring, FadeIn, FadeInDown, interpolate, Extrapolation,
+  FadeIn, interpolate, Extrapolation,
   useSharedValue, SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTaskStore } from '@/store/taskStore';
-import { useAppTheme, Spacing, FontSize, Radius, sw, sh, SCREEN_WIDTH, SCREEN_HEIGHT } from '@/constants/theme';
+import { useAppTheme, Spacing, FontSize, Radius, sw, SCREEN_WIDTH } from '@/constants/theme';
+import InteractivePressable from '@/components/InteractivePressable';
 
 interface OnboardingSlide {
   id: string;
@@ -28,33 +29,32 @@ interface OnboardingSlide {
   subtitle: string;
 }
 
-const PURPLE = '#7C3AED';
-const LIGHT_PURPLE = '#8B5CF6';
-const DARK_PURPLE = '#6D28D9';
-const WHITE = '#FFFFFF';
+const PLUM = '#4E3F6F';
+const SAGE = '#6B8E23';
+const SILVER = '#A7A19A';
 
 const SLIDES: OnboardingSlide[] = [
   {
     id: '1',
     icon: 'calendar',
-    bgColor: '#EEDEFF', // Light pastel purple
-    accentColor: PURPLE,
+    bgColor: '#E4E8D8',
+    accentColor: PLUM,
     title: 'Atur Jadwalmu\nDengan Mudah',
     subtitle: 'Tambah jadwal, tugas, dan pertemuan hanya dengan beberapa ketukan. Pilih tanggal, atur waktu, selesai!',
   },
   {
     id: '2',
     icon: 'notifications',
-    bgColor: '#F3E8FF',
-    accentColor: LIGHT_PURPLE,
+    bgColor: '#F0DDDB',
+    accentColor: SAGE,
     title: 'Tidak Ada\nYang Terlewat',
     subtitle: 'Jadwalin mengingatkanmu secara otomatis sebelum deadline tiba. Kamu akan selalu siap.',
   },
   {
     id: '3',
     icon: 'rocket',
-    bgColor: '#F5F3FF',
-    accentColor: DARK_PURPLE,
+    bgColor: '#EFE6D8',
+    accentColor: SILVER,
     title: 'Produktif\nSetiap Hari',
     subtitle: 'Dashboard intuitif, kalender visual, dan catatan pribadi membantumu tetap terorganisir dan fokus.',
   },
@@ -72,7 +72,7 @@ function SlideItem({ item, index, scrollX }: { item: OnboardingSlide; index: num
         withTiming(0, { duration: 1800 })
       ), -1, true
     );
-  }, []);
+  }, [iconFloat]);
 
   const iconAnim = useAnimatedStyle(() => ({
     transform: [{ translateY: iconFloat.value }],
@@ -102,12 +102,6 @@ function SlideItem({ item, index, scrollX }: { item: OnboardingSlide; index: num
             <Ionicons name={item.icon} size={sw(52)} color={item.accentColor} />
           </View>
         </Animated.View>
-
-        {/* Decorative dots */}
-        <View style={slideStyles.dotsDecor}>
-          <View style={[slideStyles.decorDot, { backgroundColor: item.bgColor, width: sw(8), height: sw(8) }]} />
-          <View style={[slideStyles.decorDot, { backgroundColor: item.bgColor, width: sw(5), height: sw(5), opacity: 0.6 }]} />
-        </View>
 
         {/* Text */}
         <Text style={slideStyles.title}>{item.title}</Text>
@@ -147,9 +141,9 @@ const getSlideStyles = (Colors: any) => StyleSheet.create({
   title: {
     fontSize: sw(28),
     fontWeight: '800',
-    color: Colors.brownDark,
+    color: Colors.textPrimary,
     textAlign: 'center',
-    letterSpacing: -0.5,
+    letterSpacing: 0,
     lineHeight: sw(36),
     marginBottom: sw(14),
   },
@@ -207,9 +201,9 @@ export default function OnboardingScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       {/* Skip Button */}
       <Animated.View entering={FadeIn.delay(400).duration(400)} style={styles.skipWrap}>
-        <TouchableOpacity onPress={handleSkip} activeOpacity={0.6}>
+        <InteractivePressable onPress={handleSkip}>
           <Text style={styles.skipText}>Lewati</Text>
-        </TouchableOpacity>
+        </InteractivePressable>
       </Animated.View>
 
       {/* Slides */}
@@ -247,9 +241,8 @@ export default function OnboardingScreen() {
         </View>
 
         {/* CTA Button */}
-        <TouchableOpacity
+        <InteractivePressable
           onPress={handleNext}
-          activeOpacity={0.8}
           style={[
             styles.ctaBtn,
             isLastSlide && styles.ctaBtnLast,
@@ -263,7 +256,7 @@ export default function OnboardingScreen() {
             size={sw(18)}
             color={Colors.white}
           />
-        </TouchableOpacity>
+        </InteractivePressable>
       </View>
     </View>
   );
@@ -310,7 +303,7 @@ const getStyles = (Colors: any) => StyleSheet.create({
     borderRadius: Radius.xl,
   },
   ctaBtnLast: {
-    backgroundColor: Colors.brown,
+    backgroundColor: Colors.checkGreen,
   },
   ctaBtnText: {
     color: Colors.white,
