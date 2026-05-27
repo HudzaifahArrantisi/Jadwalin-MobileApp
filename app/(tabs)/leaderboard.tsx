@@ -10,6 +10,8 @@ import {
   ScrollView,
   RefreshControl,
   Image,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,12 +37,14 @@ function PodiumCard({
   entry,
   rank,
   isCurrentUser,
+  onPress,
 }: {
   entry: LeaderboardEntry;
   rank: number;
   isCurrentUser: boolean;
+  onPress: () => void;
 }) {
-  const { Colors, isDark } = useAppTheme();
+  const { Colors } = useAppTheme();
   const level = getUserLevel(entry.points);
   const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
   const medalColor = medalColors[rank - 1] || Colors.textMuted;
@@ -48,56 +52,63 @@ function PodiumCard({
   return (
     <Animated.View
       entering={FadeInDown.delay(rank * 80).duration(360)}
-      style={[
-        styles.podiumCard,
-        {
-          backgroundColor: isCurrentUser
-            ? Colors.pastelLavender
-            : Colors.dailyCardBg,
-          borderColor: isCurrentUser ? Colors.brownDark : Colors.dailyCardBorder,
-          borderWidth: isCurrentUser ? 2 : 1,
-        },
-      ]}
     >
-      {/* Rank medal */}
-      <View style={[styles.rankCircle, { backgroundColor: medalColor }]}>
-        <Text style={styles.rankText}>{rank}</Text>
-      </View>
+      <InteractivePressable
+        accessibilityRole="button"
+        accessibilityLabel={`Lihat profil ${entry.displayName || 'User'}`}
+        accessibilityHint="Menampilkan detail profil pengguna"
+        onPress={onPress}
+        style={[
+          styles.podiumCard,
+          {
+            backgroundColor: isCurrentUser
+              ? Colors.pastelLavender
+              : Colors.dailyCardBg,
+            borderColor: isCurrentUser ? Colors.brownDark : Colors.dailyCardBorder,
+            borderWidth: isCurrentUser ? 2 : 1,
+          },
+        ]}
+      >
+        {/* Rank medal */}
+        <View style={[styles.rankCircle, { backgroundColor: medalColor }]}>
+          <Text style={styles.rankText}>{rank}</Text>
+        </View>
 
-      {/* Avatar */}
-      {entry.photoURL ? (
-        <Image source={{ uri: entry.photoURL }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatarPlaceholder, { backgroundColor: Colors.brownDark }]}>
-          <Text style={styles.avatarInitial}>
-            {(entry.displayName || 'U').charAt(0).toUpperCase()}
+        {/* Avatar */}
+        {entry.photoURL ? (
+          <Image source={{ uri: entry.photoURL }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatarPlaceholder, { backgroundColor: Colors.brownDark }]}>
+            <Text style={styles.avatarInitial}>
+              {(entry.displayName || 'U').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+
+        {/* Info */}
+        <View style={styles.entryInfo}>
+          <Text
+            style={[styles.entryName, { color: Colors.textPrimary }]}
+            numberOfLines={1}
+          >
+            {entry.displayName || 'User'}
+            {isCurrentUser ? ' (Kamu)' : ''}
+          </Text>
+          <Text style={[styles.entryLevel, { color: Colors.textMuted }]}>
+            {level.emoji} {level.name}
           </Text>
         </View>
-      )}
 
-      {/* Info */}
-      <View style={styles.entryInfo}>
-        <Text
-          style={[styles.entryName, { color: Colors.textPrimary }]}
-          numberOfLines={1}
-        >
-          {entry.displayName || 'User'}
-          {isCurrentUser ? ' (Kamu)' : ''}
-        </Text>
-        <Text style={[styles.entryLevel, { color: Colors.textMuted }]}>
-          {level.emoji} {level.name}
-        </Text>
-      </View>
-
-      {/* Stats */}
-      <View style={styles.entryRight}>
-        <Text style={[styles.entryPoints, { color: Colors.brownDark }]}>
-          {entry.points}
-        </Text>
-        <Text style={[styles.entryPointsLabel, { color: Colors.textMuted }]}>
-          poin
-        </Text>
-      </View>
+        {/* Stats */}
+        <View style={styles.entryRight}>
+          <Text style={[styles.entryPoints, { color: Colors.brownDark }]}>
+            {entry.points}
+          </Text>
+          <Text style={[styles.entryPointsLabel, { color: Colors.textMuted }]}>
+            poin
+          </Text>
+        </View>
+      </InteractivePressable>
     </Animated.View>
   );
 }
@@ -107,18 +118,22 @@ function LeaderboardRow({
   rank,
   isCurrentUser,
   index,
+  onPress,
 }: {
   entry: LeaderboardEntry;
   rank: number;
   isCurrentUser: boolean;
   index: number;
+  onPress: () => void;
 }) {
   const { Colors } = useAppTheme();
-  const level = getUserLevel(entry.points);
-
   return (
     <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
-      <View
+      <InteractivePressable
+        accessibilityRole="button"
+        accessibilityLabel={`Lihat profil ${entry.displayName || 'User'}`}
+        accessibilityHint="Menampilkan detail profil pengguna"
+        onPress={onPress}
         style={[
           styles.listRow,
           {
@@ -166,7 +181,7 @@ function LeaderboardRow({
         <Text style={[styles.listPoints, { color: Colors.brownDark }]}>
           {entry.points}
         </Text>
-      </View>
+      </InteractivePressable>
     </Animated.View>
   );
 }
@@ -176,6 +191,8 @@ export default function LeaderboardScreen() {
   const screenStyles = useMemo(() => makeStyles(Colors), [Colors]);
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const [selectedEntry, setSelectedEntry] = React.useState<LeaderboardEntry | null>(null);
+  const [selectedRank, setSelectedRank] = React.useState(0);
   const {
     leaderboard,
     monthKey,
@@ -197,6 +214,15 @@ export default function LeaderboardScreen() {
 
   const top3 = leaderboard.slice(0, 3);
   const rest = leaderboard.slice(3);
+  const selectedLevel = selectedEntry ? getUserLevel(selectedEntry.points) : null;
+  const handleSelectEntry = React.useCallback((entry: LeaderboardEntry, rank: number) => {
+    setSelectedEntry(entry);
+    setSelectedRank(rank);
+  }, []);
+  const closeProfile = React.useCallback(() => {
+    setSelectedEntry(null);
+    setSelectedRank(0);
+  }, []);
 
   return (
     <View style={[screenStyles.container, { paddingTop: insets.top + Spacing.lg }]}>
@@ -278,6 +304,7 @@ export default function LeaderboardScreen() {
             entry={entry}
             rank={index + 1}
             isCurrentUser={entry.uid === user?.uid}
+            onPress={() => handleSelectEntry(entry, index + 1)}
           />
         ))}
 
@@ -294,6 +321,7 @@ export default function LeaderboardScreen() {
             rank={index + 4}
             isCurrentUser={entry.uid === user?.uid}
             index={index}
+            onPress={() => handleSelectEntry(entry, index + 4)}
           />
         ))}
 
@@ -322,6 +350,97 @@ export default function LeaderboardScreen() {
           <Text style={screenStyles.errorText}>{error}</Text>
         )}
       </ScrollView>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={!!selectedEntry}
+        onRequestClose={closeProfile}
+      >
+        <View style={screenStyles.modalRoot}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tutup profil"
+            accessibilityHint="Menutup detail profil"
+            onPress={closeProfile}
+            style={screenStyles.modalBackdrop}
+          />
+          <View style={screenStyles.modalContent}>
+            <Animated.View
+              entering={FadeInDown.duration(220)}
+              style={[
+                screenStyles.modalCard,
+                { backgroundColor: Colors.profileBg, borderColor: Colors.dailyCardBorder },
+              ]}
+            >
+              <View style={screenStyles.modalHeader}>
+                {selectedEntry?.photoURL ? (
+                  <Image source={{ uri: selectedEntry.photoURL }} style={screenStyles.modalAvatar} />
+                ) : (
+                  <View style={[screenStyles.modalAvatarPlaceholder, { backgroundColor: Colors.brownDark }]}>
+                    <Text style={screenStyles.modalAvatarInitial}>
+                      {(selectedEntry?.displayName || 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={screenStyles.modalHeaderInfo}>
+                  <Text style={[screenStyles.modalName, { color: Colors.textPrimary }]} numberOfLines={1}>
+                    {selectedEntry?.displayName || 'User'}
+                  </Text>
+                  <View style={screenStyles.modalMetaRow}>
+                    <Text style={[screenStyles.modalMetaText, { color: Colors.textMuted }]}>
+                      {selectedRank > 0 ? `#${selectedRank}` : '-'}
+                    </Text>
+                    {selectedLevel && (
+                      <Text style={[screenStyles.modalMetaText, { color: Colors.textMuted }]}>
+                        {selectedLevel.emoji} {selectedLevel.name}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                <InteractivePressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Tutup profil"
+                  onPress={closeProfile}
+                  style={screenStyles.modalClose}
+                >
+                  <Ionicons name="close" size={sw(18)} color={Colors.textMuted} />
+                </InteractivePressable>
+              </View>
+
+              <View style={screenStyles.modalStatsRow}>
+                <View style={screenStyles.modalStat}>
+                  <Text style={[screenStyles.modalStatValue, { color: Colors.brownDark }]}>
+                    {selectedEntry?.points ?? 0}
+                  </Text>
+                  <Text style={[screenStyles.modalStatLabel, { color: Colors.textMuted }]}>
+                    Poin
+                  </Text>
+                </View>
+                <View style={[screenStyles.modalStatDivider, { backgroundColor: Colors.borderLight }]} />
+                <View style={screenStyles.modalStat}>
+                  <Text style={[screenStyles.modalStatValue, { color: Colors.brownDark }]}>
+                    {selectedEntry?.completedTasks ?? 0}
+                  </Text>
+                  <Text style={[screenStyles.modalStatLabel, { color: Colors.textMuted }]}>
+                    Tugas selesai
+                  </Text>
+                </View>
+                <View style={[screenStyles.modalStatDivider, { backgroundColor: Colors.borderLight }]} />
+                <View style={screenStyles.modalStat}>
+                  <Text style={[screenStyles.modalStatValue, { color: Colors.brownDark }]}>
+                    {selectedEntry?.currentStreak ?? 0}
+                  </Text>
+                  <Text style={[screenStyles.modalStatLabel, { color: Colors.textMuted }]}>
+                    Streak
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -551,5 +670,90 @@ const makeStyles = (Colors: any) =>
       fontSize: FontSize.xs,
       textAlign: 'center',
       marginTop: Spacing.md,
+    },
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: Colors.overlay,
+    },
+    modalContent: {
+      paddingHorizontal: Spacing.xl,
+    },
+    modalCard: {
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.md,
+    },
+    modalAvatar: {
+      width: sw(56),
+      height: sw(56),
+      borderRadius: sw(28),
+      marginRight: Spacing.md,
+    },
+    modalAvatarPlaceholder: {
+      width: sw(56),
+      height: sw(56),
+      borderRadius: sw(28),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: Spacing.md,
+    },
+    modalAvatarInitial: {
+      color: '#FFFFFF',
+      fontSize: FontSize.lg,
+      fontWeight: '700',
+    },
+    modalHeaderInfo: {
+      flex: 1,
+    },
+    modalName: {
+      fontSize: FontSize.lg,
+      fontWeight: '700',
+    },
+    modalMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.xs,
+      marginTop: Spacing.xs,
+    },
+    modalMetaText: {
+      fontSize: FontSize.xs,
+      fontWeight: '600',
+    },
+    modalClose: {
+      padding: Spacing.xs,
+      marginLeft: Spacing.sm,
+      borderRadius: Radius.full,
+    },
+    modalStatsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    modalStat: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    modalStatValue: {
+      fontSize: FontSize.xl,
+      fontWeight: '800',
+    },
+    modalStatLabel: {
+      fontSize: FontSize.xxs,
+      marginTop: 2,
+      fontWeight: '600',
+    },
+    modalStatDivider: {
+      width: 1,
+      height: sw(32),
+      marginHorizontal: Spacing.sm,
     },
   });

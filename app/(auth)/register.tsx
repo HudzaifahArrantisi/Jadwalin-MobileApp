@@ -41,6 +41,8 @@ export default function RegisterScreen() {
           ? 'Email tidak valid.'
           : error.code === 'auth/email-already-in-use'
             ? 'Email sudah terdaftar.'
+            : error.code === 'auth/username-already-in-use'
+              ? 'Username sudah digunakan. Coba nama lain.'
             : error.code === 'auth/weak-password'
               ? 'Password terlalu lemah.'
               : error.message || 'Terjadi kesalahan.';

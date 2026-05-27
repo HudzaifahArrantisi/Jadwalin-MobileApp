@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Image, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,12 +18,6 @@ const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const DAY_SHORT = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-const QUOTES = [
-  'Rapi bukan berarti penuh. Cukup yang penting terlihat jelas.',
-  'Satu jadwal yang selesai lebih berharga dari sepuluh rencana samar.',
-  'Hari yang tenang dimulai dari daftar yang sederhana.',
-];
-
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const CONTENT_PADDING = SCREEN_WIDTH < 360 ? Spacing.lg : Spacing.xl;
 const WEEK_PAGE_WIDTH = SCREEN_WIDTH - CONTENT_PADDING * 2;
@@ -52,6 +46,20 @@ const addDays = (date: Date, days: number) => {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+};
+
+const getWeekOfMonth = (date: Date) => {
+  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+  const firstWeekStart = getMonday(monthStart);
+  const currentWeekStart = getMonday(date);
+  const diffMs = currentWeekStart.getTime() - firstWeekStart.getTime();
+  return Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1;
+};
+
+const getWeekInfoLabel = (weekDates: Date[]) => {
+  const anchor = weekDates[3] || weekDates[0];
+  if (!anchor) return 'Minggu ini';
+  return `Minggu ke-${getWeekOfMonth(anchor)} ${MONTHS[anchor.getMonth()]} ${anchor.getFullYear()}`;
 };
 
 const buildCalendarDates = (centerDate: Date) => {
@@ -245,6 +253,7 @@ export default function HomeScreen() {
     return d;
   });
   const [selectedDate, setSelectedDate] = useState(today);
+  const [visibleWeekIndex, setVisibleWeekIndex] = useState(0);
   const calendarScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -266,6 +275,7 @@ export default function HomeScreen() {
     if (todayWeekIndex < 0) return;
 
     const timer = setTimeout(() => {
+      setVisibleWeekIndex(todayWeekIndex);
       calendarScrollRef.current?.scrollTo({ x: todayWeekIndex * WEEK_PAGE_WIDTH, animated: false });
     }, 80);
 
@@ -273,15 +283,20 @@ export default function HomeScreen() {
   }, [todayWeekIndex]);
 
   const selectedWeekDates = useMemo(() => {
+    const visibleWeek = calendarWeeks[visibleWeekIndex];
+    if (visibleWeek) return visibleWeek;
+
     const monday = getMonday(selectedDate);
     return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
-  }, [selectedDate]);
+  }, [calendarWeeks, selectedDate, visibleWeekIndex]);
 
   const selectedWeekTitle = useMemo(() => {
     const start = selectedWeekDates[0];
     const end = selectedWeekDates[6];
     return `${start.getDate()} ${MONTHS_SHORT[start.getMonth()]} - ${end.getDate()} ${MONTHS_SHORT[end.getMonth()]}`;
   }, [selectedWeekDates]);
+
+  const selectedWeekInfoLabel = useMemo(() => getWeekInfoLabel(selectedWeekDates), [selectedWeekDates]);
 
   const tasksByDate = useMemo(() => {
     return tasks.reduce<Record<string, Task[]>>((acc, task) => {
@@ -321,7 +336,7 @@ export default function HomeScreen() {
       });
   }, [tasks, selectedWeekDates]);
 
-  const quote = QUOTES[today.getDate() % QUOTES.length];
+  const quote = `Hallo ${user?.name || 'Pengguna'}, Selamat datang di Applikasi Jadwalin`;
   const selectedDateLabel = `${DAYS[selectedDate.getDay()]}, ${selectedDate.getDate()} ${MONTHS[selectedDate.getMonth()]}`;
 
   const onRefresh = React.useCallback(() => {
@@ -337,6 +352,21 @@ export default function HomeScreen() {
       setTimeout(() => {
         refreshGamification();
       }, 700);
+    }
+  };
+
+  const handleCalendarScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const rawIndex = Math.round(event.nativeEvent.contentOffset.x / WEEK_PAGE_WIDTH);
+    const nextIndex = clamp(rawIndex, 0, calendarWeeks.length - 1);
+    const nextWeek = calendarWeeks[nextIndex];
+
+    if (!nextWeek) return;
+
+    setVisibleWeekIndex(nextIndex);
+
+    const preferredDate = nextWeek.find((date) => sameDay(date, today)) || nextWeek[0];
+    if (preferredDate && !nextWeek.some((date) => sameDay(date, selectedDate))) {
+      setSelectedDate(preferredDate);
     }
   };
 
@@ -373,7 +403,7 @@ export default function HomeScreen() {
           levelProgress={levelProgress}
           userRank={userRank}
         />
-        <View style={screenStyles.calendarBlock}>
+        <View style={screenStyles.calendarPanel}>
           <View style={screenStyles.sectionHeader}>
             <View>
               <Text style={screenStyles.sectionTitle}>Kalender Mingguan</Text>
@@ -388,6 +418,8 @@ export default function HomeScreen() {
             contentContainerStyle={screenStyles.calendarList}
             snapToInterval={WEEK_PAGE_WIDTH}
             decelerationRate="fast"
+            onMomentumScrollEnd={handleCalendarScrollEnd}
+            onScrollEndDrag={handleCalendarScrollEnd}
           >
             {calendarWeeks.map((week, weekIndex) => {
               const todayIndex = week.findIndex((date) => sameDay(date, today));
@@ -450,7 +482,7 @@ export default function HomeScreen() {
         <View style={screenStyles.sectionHeader}>
           <View>
             <Text style={screenStyles.sectionTitle}>List Kegiatan 1 Minggu</Text>
-            <Text style={screenStyles.sectionHint}>{selectedWeekTitle} · {selectedWeekTasks.length} kegiatan</Text>
+            <Text style={screenStyles.sectionHint}>{selectedWeekInfoLabel} · {selectedWeekTitle} · {selectedWeekTasks.length} kegiatan</Text>
           </View>
           <InteractivePressable onPress={() => router.push('/(tabs)/calendar?add=true')} style={screenStyles.addMini}>
             <Ionicons name="add" size={sw(18)} color={isDark ? Colors.black : Colors.white} />
@@ -557,7 +589,15 @@ const makeStyles = (Colors: any) => StyleSheet.create({
   statBlock: { flex: 1, paddingVertical: Spacing.md, borderRightWidth: 1, borderRightColor: Colors.borderLight },
   statValue: { fontSize: FontSize.xxl, color: Colors.textPrimary, fontWeight: '700' },
   statLabel: { marginTop: Spacing.xs, fontSize: FontSize.xs, color: Colors.textSecondary },
-  calendarBlock: { marginBottom: Spacing.md },
+  calendarPanel: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.profileFormBg,
+  },
   calendarList: { paddingRight: 0 },
   calendarHint: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', marginTop: Spacing.xs },
   calendarHintText: { fontSize: FontSize.xs, fontWeight: '600', marginLeft: Spacing.xs },

@@ -19,6 +19,7 @@ import {
   limit,
   runTransaction,
   Timestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Task } from '@/types/task.types';
@@ -122,7 +123,7 @@ export async function fetchUserStats(uid: string): Promise<UserGamificationStats
       monthlyPoints: data.monthlyPoints ?? {},
       currentStreak: data.currentStreak ?? 0,
       lastCompletedDate: data.lastCompletedDate ?? null,
-      displayName: data.displayName ?? '',
+      displayName: data.displayName ?? data.name ?? '',
       photoURL: data.photoURL ?? null,
       updatedAt: data.updatedAt ?? null,
     };
@@ -130,6 +131,18 @@ export async function fetchUserStats(uid: string): Promise<UserGamificationStats
     console.warn('[Gamification] fetchUserStats failed:', err);
     return { ...EMPTY_GAMIFICATION_STATS };
   }
+}
+
+function mapLeaderboardEntry(data: any, fallbackId: string): LeaderboardEntry {
+  return {
+    uid: data.uid ?? fallbackId,
+    displayName: data.displayName ?? data.name ?? 'User',
+    photoURL: data.photoURL ?? '',
+    points: data.points ?? 0,
+    completedTasks: data.completedTasks ?? 0,
+    currentStreak: data.currentStreak ?? 0,
+    updatedAt: data.updatedAt ?? Timestamp.now(),
+  };
 }
 
 /** Fetch leaderboard for a given month (safe, returns [] on error) */
@@ -141,22 +154,33 @@ export async function fetchLeaderboard(monthKey: string): Promise<LeaderboardEnt
       limit(50)
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        uid: data.uid ?? d.id,
-        displayName: data.displayName ?? 'User',
-        photoURL: data.photoURL ?? null,
-        points: data.points ?? 0,
-        completedTasks: data.completedTasks ?? 0,
-        currentStreak: data.currentStreak ?? 0,
-        updatedAt: data.updatedAt ?? Timestamp.now(),
-      };
-    });
+    return snap.docs.map((d) => mapLeaderboardEntry(d.data(), d.id));
   } catch (err) {
     console.warn('[Gamification] fetchLeaderboard failed:', err);
     return [];
   }
+}
+
+export function subscribeToLeaderboard(
+  monthKey: string,
+  onChange: (entries: LeaderboardEntry[]) => void,
+  onError?: (error: unknown) => void
+) {
+  const q = query(
+    leaderboardUsersCol(monthKey),
+    orderBy('points', 'desc'),
+    limit(50)
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(snap.docs.map((d) => mapLeaderboardEntry(d.data(), d.id)));
+    },
+    (error) => {
+      console.warn('[Gamification] subscribeToLeaderboard failed:', error);
+      onError?.(error);
+    }
+  );
 }
 
 // ───── Award Points ─────
@@ -236,7 +260,7 @@ export async function awardTaskPoints(
           currentStreak: newStreak,
           lastCompletedDate: todayKey,
           displayName: displayName || current.displayName || '',
-          photoURL: photoURL ?? current.photoURL ?? null,
+          photoURL: photoURL ?? current.photoURL ?? String,
           updatedAt: Timestamp.now(),
         },
         { merge: true }
@@ -376,7 +400,7 @@ async function updateLeaderboard(
   const entry: LeaderboardEntry = {
     uid,
     displayName: displayName || stats.displayName || 'User',
-    photoURL: photoURL ?? stats.photoURL ?? null,
+    photoURL: photoURL ?? stats.photoURL ?? '',
     points: stats.monthlyPoints[monthKey] ?? 0,
     completedTasks,
     currentStreak: stats.currentStreak,
@@ -384,4 +408,17 @@ async function updateLeaderboard(
   };
 
   await setDoc(leaderboardUserRef(monthKey, uid), entry, { merge: true });
+}
+
+export async function syncLeaderboardProfile(
+  uid: string,
+  displayName: string,
+  photoURL: string | null
+): Promise<void> {
+  try {
+    const monthKey = getMonthKey(new Date());
+    await updateLeaderboard(uid, monthKey, displayName, photoURL);
+  } catch (err) {
+    console.warn('[Gamification] syncLeaderboardProfile failed:', err);
+  }
 }

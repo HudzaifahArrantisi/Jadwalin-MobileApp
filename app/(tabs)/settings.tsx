@@ -8,6 +8,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/services/firebase';
+import { syncLeaderboardProfile } from '@/services/gamification.service';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskStore } from '@/store/taskStore';
 import { useAppTheme, Spacing, FontSize, Radius, sw } from '@/constants/theme';
@@ -45,7 +46,7 @@ function MenuRow({
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
-  const { setUser, themeMode, toggleTheme } = useTaskStore();
+  const { setUser, themeMode, toggleTheme, showToast } = useTaskStore();
   const tasks = useTaskStore((state) => state.tasks);
   const { Colors } = useAppTheme();
   const screenStyles = useMemo(() => makeStyles(Colors), [Colors]);
@@ -102,6 +103,7 @@ export default function SettingsScreen() {
         doc(db, 'users', user.uid),
         {
           name: name.trim(),
+          displayName: name.trim(),
           job: job.trim() || null,
           address: address.trim() || null,
           photoURL: localPhotoUri || user.photoURL,
@@ -110,8 +112,10 @@ export default function SettingsScreen() {
       );
 
       setUser({ ...user, name: name.trim(), job: job.trim() || undefined, address: address.trim() || undefined, photoURL: localPhotoUri || user.photoURL });
+      await syncLeaderboardProfile(user.uid, name.trim(), localPhotoUri || user.photoURL);
       setLocalPhotoUri(null);
       setShowEdit(false);
+      showToast('Profil berhasil diperbarui');
     } catch (error: any) {
       Alert.alert('Gagal', error.message || 'Profil gagal disimpan.');
     }

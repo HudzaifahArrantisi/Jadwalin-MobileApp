@@ -11,6 +11,7 @@ import { useTaskStore } from '@/store/taskStore';
 import {
   fetchUserStats,
   fetchLeaderboard,
+  subscribeToLeaderboard,
 } from '@/services/gamification.service';
 import {
   UserGamificationStats,
@@ -69,6 +70,21 @@ export function useGamification() {
       setError('Gagal memuat leaderboard');
       // Keep existing leaderboard data
     }
+  }, [monthKey]);
+
+  // Realtime leaderboard subscription
+  useEffect(() => {
+    const unsubscribe = subscribeToLeaderboard(
+      monthKey,
+      (data) => {
+        setLeaderboard(data);
+        setError(null);
+      },
+      () => {
+        setError('Gagal memuat leaderboard');
+      }
+    );
+    return unsubscribe;
   }, [monthKey]);
 
   // Refresh all data

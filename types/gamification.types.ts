@@ -81,7 +81,7 @@ export interface TaskPointAward {
 export interface LeaderboardEntry {
   uid: string;
   displayName: string;
-  photoURL: string | null;
+  photoURL: string;
   points: number;
   completedTasks: number;
   currentStreak: number;

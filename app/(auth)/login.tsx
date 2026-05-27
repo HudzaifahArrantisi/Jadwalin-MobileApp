@@ -6,7 +6,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
-import { signInWithEmail, signInWithGoogle } from '@/services/auth.service';
+import { signInWithIdentifier, signInWithGoogle } from '@/services/auth.service';
 import { useAppTheme, Spacing, FontSize, Radius, sw } from '@/constants/theme';
 import { Env } from '@/constants/env';
 import InteractivePressable from '@/components/InteractivePressable';
@@ -92,7 +92,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Input belum lengkap', 'Email dan password wajib diisi.');
+      Alert.alert('Input belum lengkap', 'Email/username dan password wajib diisi.');
       return;
     }
     if (password.length < 6) {
@@ -103,14 +103,14 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await signInWithEmail(email.trim(), password);
+      await signInWithIdentifier(email.trim(), password);
       router.replace('/(tabs)');
     } catch (error: any) {
       const message =
         error.code === 'auth/invalid-email'
           ? 'Format email tidak valid.'
           : error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential'
-            ? 'Email atau password salah. Coba lagi.'
+            ? 'Email/username atau password salah. Coba lagi.'
             : error.message || 'Terjadi kesalahan.';
       Alert.alert('Login gagal', message);
     } finally {
@@ -151,7 +151,7 @@ export default function LoginScreen() {
               <Ionicons name="mail-outline" size={sw(18)} color={Colors.textSecondary} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="Email atau username"
                 placeholderTextColor={Colors.textMuted}
                 value={email}
                 onChangeText={setEmail}

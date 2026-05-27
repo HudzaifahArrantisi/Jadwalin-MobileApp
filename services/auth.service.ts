@@ -14,7 +14,18 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import {
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp,
+  onSnapshot,
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+} from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile } from '@/types/task.types';
 import { getUserFriendlyError, isNetworkError } from '@/utils/networkError';
@@ -38,12 +49,14 @@ async function saveUserProfile(user: User, extraData?: { name?: string }): Promi
   const snapshot = await getDoc(userRef);
   
   const displayName = extraData?.name || user.displayName || 'Pengguna';
+  const usernameLower = displayName.trim().toLowerCase();
 
   if (!snapshot.exists()) {
     await setDoc(userRef, {
       name: displayName,
       email: user.email || '',
       photoURL: user.photoURL || null,
+      usernameLower,
       createdAt: serverTimestamp(),
     });
   } else {
@@ -54,10 +67,55 @@ async function saveUserProfile(user: User, extraData?: { name?: string }): Promi
       {
         name: currentData.name || displayName,
         photoURL: currentData.photoURL || user.photoURL || null,
+        usernameLower: currentData.usernameLower || usernameLower,
       },
       { merge: true }
     );
   }
+}
+
+function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+async function ensureUsernameAvailable(username: string): Promise<void> {
+  const normalized = normalizeUsername(username);
+  if (!normalized) return;
+  const usersRef = collection(db, 'users');
+  const q = query(usersRef, where('usernameLower', '==', normalized), limit(1));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const err: any = new Error('Username already in use');
+    err.code = 'auth/username-already-in-use';
+    throw err;
+  }
+}
+
+async function resolveEmailFromUsername(username: string): Promise<string> {
+  const usersRef = collection(db, 'users');
+  const normalized = normalizeUsername(username);
+  let q = query(usersRef, where('usernameLower', '==', normalized), limit(1));
+  let snap = await getDocs(q);
+
+  if (snap.empty) {
+    q = query(usersRef, where('name', '==', username.trim()), limit(1));
+    snap = await getDocs(q);
+  }
+
+  if (snap.empty) {
+    const err: any = new Error('User not found');
+    err.code = 'auth/user-not-found';
+    throw err;
+  }
+
+  const data = snap.docs[0].data();
+  if (!data?.email) {
+    const err: any = new Error('User email not found');
+    err.code = 'auth/user-not-found';
+    throw err;
+  }
+
+  return data.email as string;
 }
 
 // ──── Auth Functions ────
@@ -80,12 +138,24 @@ export async function signInWithEmail(
   return mapFirebaseUser(result.user);
 }
 
+export async function signInWithIdentifier(
+  identifier: string,
+  password: string
+): Promise<UserProfile> {
+  const value = identifier.trim();
+  const email = value.includes('@') ? value : await resolveEmailFromUsername(value);
+  return signInWithEmail(email, password);
+}
+
 /** Register with email, password & name */
 export async function registerWithEmail(
   email: string,
   password: string,
   name?: string
 ): Promise<UserProfile> {
+  if (name) {
+    await ensureUsernameAvailable(name);
+  }
   const result = await createUserWithEmailAndPassword(auth, email, password);
 
   // Update Firebase Auth display name
